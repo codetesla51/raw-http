@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uthman's Web Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: white;
+            color: black;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+        
+        .links {
+            margin: 30px 0;
+        }
+        
+        .links a {
+            display: inline-block;
+            margin: 10px 20px 10px 0;
+            color: #0066cc;
+            text-decoration: none;
+        }
+        
+        .links a:hover {
+            text-decoration: underline;
+        }
+        
+        .routes {
+            margin-top: 40px;
+        }
+        
+        .routes ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        .routes li {
+            margin: 8px 0;
+        }
+        
+        .routes a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        
+        .routes a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to Uthman's Web Server</h1>
+    
+    <p>This is a custom HTTP server built from scratch using Go. No frameworks used - just pure TCP socket programming and HTTP protocol implementation.</p>
+    
+    <div class="links">
+        <a href="https://github.com/uthmankingofthebest/http-server-go">Source Code Repository</a>
+        <a href="https://uthman.dev">Uthman's Website</a>
+    </div>
+    
+    <div class="routes">
+        <h3>Available Routes:</h3>
+        <ul>
+            <li><a href="/time">Current Server Time</a></li>
+            <li><a href="/hello">Hello Page</a></li>
+            <li><a href="/test.html">Static File Example</a></li>
+        </ul>
+    </div>
+    
+    <p><strong>Server Features:</strong></p>
+    <ul>
+        <li>Concurrent connection handling with goroutines</li>
+        <li>HTTP request parsing and header processing</li>
+        <li>File-based static content serving</li>
+        <li>Dynamic route handling</li>
+        <li>User-Agent detection</li>
+    </ul>
+    
+</body>
+</html>

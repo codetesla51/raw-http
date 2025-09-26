@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -36,7 +38,24 @@ func runConnection(conn net.Conn) {
 	}
 	request := string(buffer[:n])
 	fmt.Println("Received request:", request)
-	lines := strings.Split(request, "\r\n")
+	requestParts := strings.SplitN(request, "\r\n\r\n", 2)
+	headerSection := requestParts[0]
+	body := ""
+	bodyMap := make(map[string]string)
+
+	if len(requestParts) > 1 {
+		body = requestParts[1]
+		pairs := strings.Split(body, "&")
+		for _, pair := range pairs {
+			parts := strings.Split(pair, "=")
+			if len(parts) == 2 {
+				key := parts[0]
+				value := parts[1]
+				bodyMap[key] = value
+			}
+		}
+	}
+	lines := strings.Split(headerSection, "\r\n")
 	if len(lines) == 0 {
 		fmt.Println("Invalid request")
 		return
@@ -74,28 +93,45 @@ func runConnection(conn net.Conn) {
 	version := parts[2]
 	fmt.Printf("Method: %s, Path: %s, Version: %s\n", method, path, version)
 	var response string
+	var filePath string
+	if path == "/" {
+		filePath = "pages/index.html"
+	} else {
+		filePath = "pages" + path
+	}
 	switch method {
 	case "GET":
-		switch path {
-		case "/hello":
-			response = createResponse("200", "OK", "Hello "+browserName+" user!")
-		case "/time":
-			currentTime := time.Now()
-			formattedTime := currentTime.Format("15:04:05")
-			response = createResponse("200", "OK", formattedTime)
-		default:
-			response = createResponse("404", "Not Found", "Route Not found")
+		if fileExists(filePath) {
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				fmt.Printf("Error reading file: %v\n", err)
+			}
+			response = createResponse("200", "OK", string(content))
+		} else {
+			switch path {
+			case "/hello":
+				response = createResponse("200", "OK", "Hello "+browserName+" user!")
+			case "/time":
+				currentTime := time.Now()
+				formattedTime := currentTime.Format("15:04:05")
+				response = createResponse("200", "OK", formattedTime)
+			default:
+				response = createResponse("404", "Not Found", "Route Not found")
+			}
 		}
 	case "POST":
 		switch path {
 		case "/test":
-			response = createResponse("200", "OK", "Hello from test Post")
+			username := getFormValue(bodyMap, "username", "anonymous")
+			password := getFormValue(bodyMap, "password", "")
+			response = createResponse("200", "OK", username+password)
 		default:
 			response = createResponse("404", "Not Found", "Route Not found")
 		}
 	default:
 		response = createResponse("405", "Method Not Allowed", "Method not supported")
 	}
+
 	_, err = conn.Write([]byte(response))
 	if err != nil {
 		fmt.Println("Error writing response:", err)
@@ -109,4 +145,21 @@ func createResponse(statusCode, statusMessage, body string) string {
 		"\r\nContent-Type: text/html" +
 		"\r\nContent-Length: " + strconv.Itoa(len(body)) +
 		"\r\n\r\n" + body
+}
+func fileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	fmt.Printf("Error checking file %s: %v\n", filePath, err)
+	return false
+}
+func getFormValue(bodyMap map[string]string, key string, defaultValue string) string {
+	if value, exists := bodyMap[key]; exists {
+		return value
+	}
+	return defaultValue
 }
