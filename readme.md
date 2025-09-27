@@ -2,7 +2,7 @@
 
 A lightweight HTTP server built from raw TCP sockets in Go to understand HTTP protocol internals and network programming fundamentals. No frameworks - just socket programming and HTTP parsing.
 
-**Peak performance: 1,710 RPS** | **Built for learning, not production**
+**Peak performance: 4,000  RPS** | **Built for learning, not production**
 
 ## Quick Start
 
