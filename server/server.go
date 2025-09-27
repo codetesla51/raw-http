@@ -1,7 +1,43 @@
+// Server package comment block:
+/*
+HTTP Server from Raw TCP Sockets
+
+Author: Uthman Dev
+GitHub: https://github.com/codetesla51
+Repository: https://github.com/codetesla51/raw-http
+
+This package implements a basic HTTP server built directly on top of TCP sockets
+without using Go's net/http package. It demonstrates fundamental HTTP protocol
+handling including request parsing, routing, and response generation.
+
+Features:
+- Raw TCP connection handling with keep-alive support
+- Custom HTTP request/response parsing
+- Simple routing system with method and path matching
+- Static file serving with MIME type detection
+- Form data and JSON body parsing
+- Basic security protections (path traversal, request limits)
+
+Limitations:
+- No HTTPS/TLS support
+- Basic error handling and recovery
+- Simple routing (no path parameters or wildcards)
+- Limited HTTP method and header support
+- Not suitable for production use
+
+This is primarily an educational project to understand HTTP internals
+and network programming fundamentals in Go.
+*/
+
+// ========================================================================
+
 package server
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/fatih/color"
 	"log"
 	"mime"
 	"net"
@@ -12,6 +48,28 @@ import (
 	"strings"
 	"time"
 )
+
+type Request struct {
+	Query   map[string]string
+	Body    map[string]string
+	Browser string
+	Method  string
+	Path    string
+}
+type RouteHandler func(req *Request) (response, status string)
+
+// Router manages route registration and handling
+type Router struct {
+	routes map[string]map[string]RouteHandler
+	// method -> path -> handler
+}
+
+// NewRouter creates a new router instance
+func NewRouter() *Router {
+	return &Router{
+		routes: make(map[string]map[string]RouteHandler),
+	}
+}
 
 func init() {
 	// Extra mime types
@@ -34,11 +92,17 @@ func init() {
 	mime.AddExtensionType(".otf", "font/otf")
 	mime.AddExtensionType(".eot", "application/vnd.ms-fontobject")
 }
+
 func readHTTPRequest(conn net.Conn) (string, error) {
 	var headerBuffer []byte
-
+	maxHeaderSize := 8192
+	timeout := time.Now().Add(10 * time.Second)
 	// Read request in small chunks until we find end of headers
 	for {
+		conn.SetReadDeadline(timeout)
+		if len(headerBuffer) > maxHeaderSize {
+			return "", errors.New("headers too large")
+		}
 		chunk := make([]byte, 256)
 		n, err := conn.Read(chunk)
 		if err != nil {
@@ -54,7 +118,8 @@ func readHTTPRequest(conn net.Conn) (string, error) {
 
 	return string(headerBuffer), nil
 }
-func runConnection(conn net.Conn) {
+
+func (r *Router) RunConnection(conn net.Conn) {
 	defer conn.Close()
 	requestCount := 0
 	for requestCount < 3 {
@@ -71,14 +136,7 @@ func runConnection(conn net.Conn) {
 		headerSection := requestParts[0]
 		body := ""
 		var bodyMap map[string]string
-
-		// Parse body if present
-		if len(requestParts) > 1 {
-
-			body = requestParts[1]
-			bodyMap = parseKeyValuePairs(body)
-		}
-
+		var headerMap map[string]string
 		// === PARSE HEADERS ===
 		lines := strings.Split(headerSection, "\r\n")
 		if len(lines) == 0 {
@@ -87,9 +145,23 @@ func runConnection(conn net.Conn) {
 		}
 		firstLine := lines[0]
 		headerLines := lines[1:]
-		var headerMap map[string]string
 		headerMap = parseHeaders(headerLines)
+		// Parse body if present
+		if len(requestParts) > 1 {
+			body = requestParts[1]
+			if len(requestParts) > 1 {
+				body = requestParts[1]
+				contentType := headerMap["Content-Type"]
+				if strings.Contains(contentType, "application/json") {
 
+					bodyMap = parseJSONBody(body)
+
+				} else {
+
+					bodyMap = parseKeyValuePairs(body)
+				}
+			}
+		}
 		// === HANDLE CONTENT-LENGTH (READ REMAINING BODY IF NEEDED) ===
 		contentLengthStr := headerMap["Content-Length"]
 		if contentLengthStr != "" {
@@ -134,20 +206,17 @@ func runConnection(conn net.Conn) {
 				// Parse query parameters (key=value&key2=value2)
 				queryMap = parseKeyValuePairs(queryPath)
 			}
-
 		}
 
 		// === ROUTING AND RESPONSE GENERATION ===
 		var response, status string
 		var filePath string
-		var contentType string
 
 		// Determine file path for static files
-
 		rawPath := cleanPath
 		cleanedRawPath := filepath.Clean(rawPath)
 		if strings.Contains(cleanedRawPath, "..") {
-			response, status = createResponse("403", "text/plain", "Forbidden", "Access denied")
+			response, status = CreateResponse("403", "text/plain", "Forbidden", "Access denied")
 			goto sendResponse
 		} else {
 			// Safe to add pages prefix
@@ -158,11 +227,29 @@ func runConnection(conn net.Conn) {
 			}
 		}
 
-		// Route based on HTTP method
-		response, status = handleRoute(method, cleanPath, contentType, queryMap, bodyMap, browserName, filePath)
+		if fileExists(filePath) {
+			content, success := readFileContent(filePath)
+			if success {
+				contentType := getContentType(filePath)
+				response, status = CreateResponse("200", contentType, "OK", string(content))
+			} else {
+				response, status = serve404()
+			}
+		} else {
+			response, status = r.Handle(method, cleanPath, queryMap, bodyMap, browserName)
+		}
+
 		// === SEND RESPONSE ===
+
 	sendResponse:
-		log.Printf("%s %s %s", method, path, status)
+		switch status {
+		case "200":
+			log.Print(color.GreenString("%s %s %s", method, path, status))
+		case "404", "403", "405":
+			log.Print(color.RedString("%s %s %s", method, path, status))
+		default:
+			log.Printf("%s %s %s", method, path, status)
+		}
 		_, err = conn.Write([]byte(response))
 		if err != nil {
 			log.Println("Error writing response:", err)
@@ -172,18 +259,15 @@ func runConnection(conn net.Conn) {
 			break
 		}
 
-		//   log.Printf("Request %d completed, keeping connection alive", requestCount+1)
-
+		requestCount++
 	}
-	//   log.Println("Connection closed after", requestCount, "requests")
-
 }
 
-// createResponse builds a complete HTTP response with proper headers
-func createResponse(statusCode, contentType, statusMessage, body string) (string, string) {
+// CreateResponse builds a complete HTTP response with proper headers
+func CreateResponse(statusCode, contentType, statusMessage, body string) (string, string) {
 	return "HTTP/1.1 " + statusCode + " " + statusMessage +
 		"\r\nContent-Type: " + contentType +
-		"\r\nConnection: keep-alive" + // Add this line
+		"\r\nConnection: keep-alive" +
 		"\r\nContent-Length: " + strconv.Itoa(len(body)) +
 		"\r\n\r\n" + body, statusCode
 }
@@ -203,6 +287,7 @@ func fileExists(filePath string) bool {
 
 // getFormValue retrieves a value from form data with a default fallback
 func getFormValue(bodyMap map[string]string, key string, defaultValue string) string {
+
 	if value, exists := bodyMap[key]; exists {
 		return value
 	}
@@ -215,11 +300,12 @@ func serve404() (string, string) {
 	content, success := readFileContent(cleanedPath)
 	if !success {
 		log.Printf("Error reading 404.html")
-		return createResponse("404", "text/plain", "Not Found", "Route Not Found")
+		return CreateResponse("404", "text/plain", "Not Found", "Route Not Found")
 	}
-	response, status := createResponse("404", "text/html", "Not Found", string(content))
+	response, status := CreateResponse("404", "text/html", "Not Found", string(content))
 	return response, status
 }
+
 func detectBrowser(userAgent string) string {
 	if strings.Contains(userAgent, "Chrome") {
 		return "Chrome"
@@ -231,6 +317,7 @@ func detectBrowser(userAgent string) string {
 		return "Unknown Browser"
 	}
 }
+
 func readFileContent(filePath string) ([]byte, bool) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -239,6 +326,7 @@ func readFileContent(filePath string) ([]byte, bool) {
 	}
 	return content, true
 }
+
 func safeURLDecode(encoded string) string {
 	decoded, err := url.QueryUnescape(encoded)
 	if err != nil {
@@ -247,6 +335,7 @@ func safeURLDecode(encoded string) string {
 	}
 	return decoded
 }
+
 func parseKeyValuePairs(data string) map[string]string {
 	resultMap := make(map[string]string)
 	pairs := strings.Split(data, "&")
@@ -264,15 +353,15 @@ func parseKeyValuePairs(data string) map[string]string {
 	}
 	return resultMap
 }
+
 func parseRequestLine(firstLine string) (method, path string, err error) {
 	parts := strings.Split(firstLine, " ")
 	if len(parts) < 3 {
-		return "", "", errors.New("Invalid request line")
-		
+		return "", "", errors.New("invalid request line")
 	}
 	return parts[0], parts[1], nil
-
 }
+
 func parseHeaders(headerLines []string) map[string]string {
 	headerMap := make(map[string]string)
 	for _, headerLine := range headerLines {
@@ -283,93 +372,34 @@ func parseHeaders(headerLines []string) map[string]string {
 			headerMap[key] = value
 		}
 	}
-
 	return headerMap
 }
 
-func handleRoute(method, cleanPath, contentType string, queryMap, bodyMap map[string]string, browserName, filePath string) (response, status string) {
-
-	switch method {
-	case "GET":
-		// Try to serve static file first
-		if fileExists(filePath) {
-			content, success := readFileContent(filePath)
-			if success {
-				contentType = getContentType(filePath)
-				response, status = createResponse("200", contentType, "OK", string(content))
-			} else {
-				response, status = serve404()
-			}
-		} else {
-			// Handle dynamic GET routes
-			switch cleanPath {
-			case "/hello":
-				name := queryMap["name"]
-				if name == "" {
-					name = "guest"
-				}
-				response, status = createResponse("200", "text/plain", "OK", "Hello "+browserName+" "+name+" user!")
-
-			case "/time":
-				currentTime := time.Now()
-				formattedTime := currentTime.Format("15:04:05")
-				response, status = createResponse("200", "text/plain", "OK", formattedTime)
-
-			default:
-				response, status = serve404()
-			}
-		}
-
-	case "POST":
-		// Handle POST routes
-		switch cleanPath {
-		case "/test":
-			username := getFormValue(bodyMap, "username", "anonymous")
-			password := getFormValue(bodyMap, "password", "")
-			response, status = createResponse("200", "text/plain", "OK", username+password)
-
-		default:
-			response, status = createResponse("404", "text/plain", "Not Found", "Route Not found")
-		}
-
-	case "PUT":
-		// Handle PUT routes
-		switch cleanPath {
-		case "/user":
-			username := getFormValue(bodyMap, "username", "anonymous")
-			response, status = createResponse("200", "text/plain", "OK", "Updated user: "+username)
-
-		default:
-			response, status = createResponse("404", "text/plain", "Not Found", "PUT route not found")
-		}
-
-	case "DELETE":
-		// Handle DELETE routes
-		switch cleanPath {
-		case "/user":
-			response, status = createResponse("200", "text/plain", "OK", "User deleted")
-
-		default:
-			response, status = createResponse("404", "text/plain", "Not Found", "DELETE route not found")
-		}
-
-	case "PATCH":
-		// Handle PATCH routes
-		switch cleanPath {
-		case "/user":
-			username := getFormValue(bodyMap, "username", "anonymous")
-			response, status = createResponse("200", "text/plain", "OK", "Patched user: "+username)
-
-		default:
-			response, status = createResponse("404", "text/plain", "Not Found", "PATCH route not found")
-		}
-
-	default:
-		// Unsupported HTTP method
-		response, status = createResponse("405", "text/plain", "Method Not Allowed", "Method not supported")
+func (r *Router) Register(method, path string, handler RouteHandler) {
+	if r.routes[method] == nil {
+		r.routes[method] = make(map[string]RouteHandler)
 	}
+	r.routes[method][path] = handler
+}
+
+// Handle processes a request through the registered routes
+func (r *Router) Handle(method, cleanPath string, queryMap, bodyMap map[string]string, browserName string) (response, status string) {
+	if methodRoutes, exists := r.routes[method]; exists {
+		if handler, exists := methodRoutes[cleanPath]; exists {
+			req := &Request{
+				Query:   queryMap,
+				Body:    bodyMap,
+				Browser: browserName,
+				Method:  method,
+				Path:    cleanPath,
+			}
+			return handler(req)
+		}
+	}
+	response, status = serve404()
 	return response, status
 }
+
 func getContentType(filePath string) string {
 	ext := filepath.Ext(filePath)
 	contentType := mime.TypeByExtension(ext)
@@ -377,4 +407,19 @@ func getContentType(filePath string) string {
 		contentType = "application/octet-stream"
 	}
 	return contentType
+}
+func parseJSONBody(body string) map[string]string {
+	var jsonData map[string]any
+	result := make(map[string]string)
+
+	if err := json.Unmarshal([]byte(body), &jsonData); err != nil {
+		log.Printf("JSON parse error: %v", err)
+		return result
+	}
+
+	for key, value := range jsonData {
+		result[key] = fmt.Sprintf("%v", value)
+	}
+
+	return result
 }
