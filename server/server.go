@@ -163,7 +163,8 @@ func (r *Router) RunConnection(conn net.Conn) {
 
 		request, err := readHTTPRequest(conn)
 		if err != nil {
-			log.Println("Error reading request:", err)
+		  //Debug to see if it time's out correctly 
+	//		log.Println("Error reading request:", err)
 			return
 		}
 
