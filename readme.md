@@ -1,52 +1,88 @@
 # HTTP Server from Scratch
 
-A lightweight HTTP server built from raw TCP sockets in Go, created to understand HTTP protocol internals and network programming fundamentals.
+A lightweight HTTP server built from raw TCP sockets in Go to understand HTTP protocol internals and network programming fundamentals. No frameworks - just socket programming and HTTP parsing.
 
-## Features
-
-- **Raw TCP handling** - Parses HTTP requests directly from socket connections
-- **Custom routing** - Simple router with method and path matching
-- **Static file serving** - Serves files from a `pages` directory with proper MIME types
-- **Template rendering** - Supports Go's `html/template` for dynamic content
-- **Connection management** - Keep-alive support with proper connection reuse
-- **Security basics** - Path traversal protection and request size/timeout limits
-- **Form & JSON parsing** - Handles both URL-encoded forms and JSON request bodies
+**Peak performance: 1,710 RPS** | **Built for learning, not production**
 
 ## Quick Start
 
 ```bash
-# Clone and run
+git clone https://github.com/codetesla51/raw-http
+cd raw-http
 go mod tidy
 go run main.go
 
 # Server starts on http://localhost:8080
 ```
 
+Try it:
+```bash
+curl http://localhost:8080/ping
+# Returns: pong
+
+curl -X POST http://localhost:8080/login \
+  -d "username=admin&password=secret"
+# Returns: Login successful HTML page
+```
+
+## Features
+
+- **Raw TCP handling** - Parses HTTP requests directly from socket connections
+- **Custom routing** - Simple router with method and path matching  
+- **Static file serving** - Serves files from `pages/` with proper MIME types
+- **Template rendering** - Supports Go's `html/template` for dynamic content
+- **Connection management** - Keep-alive support with proper connection reuse
+- **Form & JSON parsing** - Handles both URL-encoded forms and JSON request bodies
+- **Security basics** - Path traversal protection and request limits
+
 ## Example Usage
 
 ```go
 router := server.NewRouter()
 
-// Register routes
-router.Register("GET", "/welcome", func(req *server.Request) (string, string) {
-    return server.CreateResponse("200", "text/html", "OK", "<h1>Hello World</h1>")
-})
-
+// Handle form submissions with browser detection
 router.Register("POST", "/login", func(req *server.Request) (string, string) {
     username := req.Body["username"]
-    // Handle login logic...
-    return server.CreateResponse("200", "text/html", "OK", response)
+    browser := req.Browser // "Chrome", "Firefox", etc.
+    
+    if username == "admin" {
+        return server.CreateResponse("200", "text/html", "OK", 
+            "<h1>Welcome "+username+"!</h1><p>Browser: "+browser+"</p>")
+    }
+    return server.CreateResponse("401", "text/html", "Unauthorized", 
+        "<h1>Login Failed</h1>")
+})
+
+// Simple API endpoint
+router.Register("GET", "/ping", func(req *server.Request) (string, string) {
+    return server.CreateResponse("200", "text/plain", "OK", "pong")
 })
 ```
 
-## What I Learned
+## Performance
 
-- How HTTP requests are structured and parsed
-- TCP connection lifecycle and keep-alive mechanics
-- Security considerations (DoS protection, path traversal)
-- Go's networking primitives and goroutine-per-connection model
-- Template rendering and form data handling
-- The critical importance of proper connection reuse for performance
+| Test Scenario | RPS | Response Time | Notes |
+|---------------|-----|---------------|-------|
+| Keep-alive (100 concurrent) | 1,710 | 58ms avg | Optimal performance |
+| Connection: close (after bug fix) | 1,389 | 720ms avg | Fixed but no connection reuse |
+| Connection: close (with bug) | 282 | 3550ms avg | Original buggy version |
+
+**Key insight:** Keep-alive provides 23% performance improvement over connection close, while fixing the original bug provided nearly 5x improvement.
+
+### Optimization Journey
+- **Initial buggy version:** ~250-282 RPS (Connection: close with processing bug)
+- **Bug fix:** 1,389 RPS (Connection: close, but fixed request handling) 
+- **Keep-alive optimization:** 1,710 RPS (enabled proper connection reuse)
+
+**Total improvement:** 6-7x from initial version
+
+## Under the Hood
+
+- **TCP Connection Pooling:** HTTP/1.1 keep-alive implementation
+- **Custom HTTP Parser:** Zero-dependency request parsing with chunked reading
+- **Goroutine-per-connection:** Leverages Go's concurrency model
+- **MIME Detection:** Comprehensive content-type handling for static files
+- **Memory Efficient:** Streams request bodies instead of full buffering
 
 ## Project Structure
 
@@ -57,9 +93,21 @@ router.Register("POST", "/login", func(req *server.Request) (string, string) {
 ├── pages/                 # Static files and templates
 │   ├── index.html
 │   ├── login.html
-│   └── welcome.html
+│   ├── welcome.html
+│   └── styles.css
 └── main.go               # Example web application
 ```
+
+## What I Learned
+
+Building from TCP sockets up provided insights into:
+
+- How HTTP requests are structured and parsed at the protocol level
+- TCP connection lifecycle and keep-alive mechanics  
+- Security considerations (DoS protection, path traversal attacks)
+- Go's networking primitives and goroutine-per-connection model
+- Template rendering and form data handling from scratch
+- The critical importance of proper connection reuse for performance
 
 ## Testing
 
@@ -67,67 +115,34 @@ router.Register("POST", "/login", func(req *server.Request) (string, string) {
 go test ./server
 ```
 
-## Performance Benchmarks
-
-### Connection: close Performance (Bug Fixed)
-Tested with `ab -n 5000 -c 1000 -H "Connection: close" http://localhost:8080/ping`:
-
-| Concurrent Connections | Requests/sec | Avg Response Time | Notes |
-|------------------------|--------------|-------------------|-------|
-| 1000                   | ~250         | 3993ms            | Original buggy version |
-| 1000                   | ~282         | 3550ms            | After bug fix, new TCP connection per request |
-
-### Keep-alive Performance  
-Tested with `ab -n 5000 -c 1000 -k http://localhost:8080/ping` and `ab -n 1000 -c 100 -k http://localhost:8080/ping`:
-
-| Concurrent Connections | Requests/sec | Avg Response Time | Keep-alive Requests | Command |
-|------------------------|--------------|-------------------|---------------------|---------|
-| 100                    | ~1710        | 58ms              | 1000/1000          | `ab -n 1000 -c 100 -k` |
-| 1000                   | ~1389        | 720ms             | 5000/5000          | `ab -n 5000 -c 1000 -k` |
-
-### Smaller Scale Testing
-`ab -n 1000 -c 100 -k http://localhost:8080/ping`:
-- **1710 RPS** with 0.585ms mean response time
-- Most requests complete in 12-20ms
-- 100% connection reuse efficiency
-
-**Performance Summary:**
-- **Peak throughput**: ~1710 RPS with keep-alive enabled
-- **Connection reuse impact**: 5-6x performance improvement over Connection: close
-- **Optimal load**: 100-1000 concurrent connections with keep-alive
-- **Reliability**: 0% failure rate across all test scenarios
-
-**Key Optimizations**: 
-1. Fixed initial bug affecting request processing (250 → 282 RPS)
-2. Removed connection limit loop to enable proper keep-alive support (282 → 1389-1710 RPS)
-Combined improvements: 6-7x performance increase from initial buggy version.
-
-## Architecture Insights
-
-The server demonstrates several important HTTP server concepts:
-
-**Connection Management**: Initially limited connection reuse due to a request limit loop. Removing this artificial constraint and implementing proper keep-alive handling resulted in 5-6x performance improvement.
-
-**Concurrency Model**: Uses Go's goroutine-per-connection approach, which scales well for I/O-bound workloads typical of HTTP servers.
-
-**Request Processing**: Direct TCP socket parsing provides insight into HTTP protocol structure while maintaining competitive performance.
+The test suite covers request parsing, routing, response generation, and includes integration tests with real TCP connections.
 
 ## Limitations
 
 This is a learning project, not production software:
+
 - **No HTTPS/TLS support**
-- **Basic error handling**
-- **Simple routing** (no path parameters or regex)
+- **Basic error handling** 
+- **Simple routing** (no path parameters or regex matching)
 - **No middleware system**
 - **Limited HTTP method support**
-- **No load balancing or clustering**
 
 ## Why Build This?
 
 Most web development happens at the framework level (Express, Flask, etc.). Building from TCP sockets up helps understand what's actually happening under the hood - HTTP parsing, connection management, and the networking fundamentals that frameworks abstract away.
 
-The performance optimization journey from ~280 RPS to ~1700 RPS by fixing connection reuse demonstrates how low-level implementation details can have dramatic performance impacts.
+The performance optimization journey demonstrates how low-level implementation details can have dramatic impacts on throughput and response times.
+
+## Routes Available
+
+Visit these paths when running the server:
+
+- `/` - Home page with project info
+- `/welcome` - Dynamic template rendering demo
+- `/login` - Form handling example  
+- `/hello` - About page with technical details
+- `/ping` - Simple API endpoint
 
 ---
 
-*Built with Go 1.21+*
+*Built with Go 1.21+ • Created by [Uthman](https://github.com/codetesla51) • Learning project focused on HTTP fundamentals*
