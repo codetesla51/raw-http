@@ -1,15 +1,79 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-  <title>{{.Title}}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
-
 <body>
-  <h1>Welcome {{.Name}}!</h1>
-  
-  <p>You're using: {{.Browser}}</p>
-  <p>Current Time is :{{.Time}}</p>
-</body>
+    <div class="container">
+        <h1>
+            <i data-lucide="user-check" class="header-icon"></i>
+            Welcome {{.Name}}!
+        </h1>
+        
+        <p>You've successfully accessed the Go template rendering system. This page demonstrates dynamic content generation with server-side data processing.</p>
+        
+        <div class="welcome-info">
+            <p>
+                <i data-lucide="monitor"></i>
+                <strong>Browser:</strong> {{.Browser}}
+            </p>
+            <p>
+                <i data-lucide="clock"></i>
+                <strong>Server Time:</strong> {{.Time}}
+            </p>
+        </div>
+        
+        <div class="nav-links">
+            <a href="/">
+                <i data-lucide="home"></i>
+                Back to Home
+            </a>
+            <a href="/login.html">
+                <i data-lucide="log-in"></i>
+                Try Login Again
+            </a>
+        </div>
+        
+        <div class="feature-list">
+            <h3>
+                <i data-lucide="code" class="section-icon"></i>
+                Template Features
+            </h3>
+            <ul>
+                <li>
+                    <i data-lucide="refresh-cw"></i>
+                    Dynamic content rendering
+                </li>
+                <li>
+                    <i data-lucide="variable"></i>
+                    Variable interpolation
+                </li>
+                <li>
+                    <i data-lucide="server"></i>
+                    Server-side processing
+                </li>
+                <li>
+                    <i data-lucide="activity"></i>
+                    Real-time data display
+                </li>
+            </ul>
+        </div>
 
+        <div class="info-card">
+            <h4>
+                <i data-lucide="info"></i>
+                Template System
+            </h4>
+            <p>This page uses Go's html/template package to dynamically insert data from the server. The name, browser, and timestamp are all generated server-side and injected into the HTML template.</p>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
 </html>

@@ -1,91 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uthman's Web Server</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: white;
-            color: black;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        
-        h1 {
-            color: #333;
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 10px;
-        }
-        
-        .links {
-            margin: 30px 0;
-        }
-        
-        .links a {
-            display: inline-block;
-            margin: 10px 20px 10px 0;
-            color: #0066cc;
-            text-decoration: none;
-        }
-        
-        .links a:hover {
-            text-decoration: underline;
-        }
-        
-        .routes {
-            margin-top: 40px;
-        }
-        
-        .routes ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        
-        .routes li {
-            margin: 8px 0;
-        }
-        
-        .routes a {
-            color: #0066cc;
-            text-decoration: none;
-        }
-        
-        .routes a:hover {
-            text-decoration: underline;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Uthman's Web Server</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
+
 <body>
-    <h1>Welcome to Uthman's Web Server</h1>
+  <div class="container">
+    <h1>
+      <i data-lucide="server" class="header-icon"></i>
+      Uthman's Web Server
+    </h1>
     
-    <p>This is a custom HTTP server built from scratch using Go. No frameworks used - just pure TCP socket programming and HTTP protocol implementation.</p>
+    <p>Custom HTTP server built from scratch using Go. No frameworks - just pure TCP socket programming and HTTP
+      protocol implementation.</p>
     
-    <div class="links">
-        <a href="https://github.com/uthmankingofthebest/http-server-go">Source Code Repository</a>
-        <a href="https://uthman.dev">Uthman's Website</a>
+    <div class="nav-links">
+      <a href="https://github.com/codetesla51/raw-http">
+        <i data-lucide="github"></i>
+        Source Code
+      </a>
+      <a href="https://uthman.dev">
+        <i data-lucide="globe"></i>
+        My Website
+      </a>
     </div>
     
-    <div class="routes">
-        <h3>Available Routes:</h3>
-        <ul>
-            <li><a href="/time">Current Server Time</a></li>
-            <li><a href="/hello">Hello Page</a></li>
-            <li><a href="/test.html">Static File Example</a></li>
-        </ul>
-    </div>
-    
-    <p><strong>Server Features:</strong></p>
-    <ul>
-        <li>Concurrent connection handling with goroutines</li>
-        <li>HTTP request parsing and header processing</li>
-        <li>File-based static content serving</li>
-        <li>Dynamic route handling</li>
-        <li>User-Agent detection</li>
+    <h3>
+      <i data-lucide="route" class="section-icon"></i>
+      Available Routes
+    </h3>
+    <ul class="route-list">
+      <li>
+        <a href="/hello">
+          <i data-lucide="hand-wave"></i>
+          Hello Page
+        </a>
+      </li>
+      <li>
+        <a href="/login.html">
+          <i data-lucide="log-in"></i>
+          Login Test
+        </a>
+      </li>
+      <li>
+        <a href="/welcome">
+          <i data-lucide="home"></i>
+          Welcome Template
+        </a>
+      </li>
     </ul>
     
+    <h3>
+      <i data-lucide="settings" class="section-icon"></i>
+      Server Features
+    </h3>
+    <div class="feature-list">
+      <ul>
+        <li>
+          <i data-lucide="network"></i>
+          Raw TCP socket handling with keep-alive
+        </li>
+        <li>
+          <i data-lucide="code"></i>
+          Custom HTTP request/response parsing
+        </li>
+        <li>
+          <i data-lucide="file-text"></i>
+          Static file serving with MIME detection
+        </li>
+        <li>
+          <i data-lucide="git-branch"></i>
+          Simple routing system
+        </li>
+        <li>
+          <i data-lucide="monitor"></i>
+          User-Agent browser detection
+        </li>
+        <li>
+          <i data-lucide="zap"></i>
+          ~1700 RPS performance
+        </li>
+      </ul>
+    </div>
+    
+    <div class="info-card">
+      <h4>
+        <i data-lucide="info"></i>
+        Performance Stats
+      </h4>
+      <p>Benchmarked at 1700+ requests per second with keep-alive connections. Built to demonstrate HTTP fundamentals
+        and Go's networking capabilities.</p>
+    </div>
+  </div>
+  
+  <script>
+    lucide.createIcons();
+  </script>
 </body>
+
 </html>

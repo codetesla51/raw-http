@@ -51,8 +51,13 @@ func main() {
 	log.Println("Server listening at Port: 8080")
 	router := server.NewRouter()
 	router.Register("GET", "/welcome", homeHandler)
+	router.Register("GET", "/hello", handleHello)
 	router.Register("GET", "/login", loginHandler)
 	router.Register("POST", "/login", loginHandler)
+	router.Register("GET", "/ping", func(req *server.Request) (string, string) {
+		return server.CreateResponse("200", "text/plain", "OK", "pong")
+	})
+
 	// Accept connections in infinite loop
 	for {
 		conn, err := listener.Accept()
@@ -111,6 +116,19 @@ func loginHandler(req *server.Request) (response, status string) {
 		} else {
 			return server.CreateResponse("200", "text/html", "OK", "<h1>Login Failed</h1><p>Wrong username or password</p>")
 		}
+	}
+	return server.CreateResponse("200", "text/html", "OK",
+		result.String())
+}
+func handleHello(req *server.Request) (response, status string) {
+	var result bytes.Buffer
+	t, err := template.ParseFiles("pages/hello.html")
+	if err != nil {
+		return server.CreateResponse("500", "text/plain", "Error", "Could not load template")
+	}
+	err = t.Execute(&result, nil)
+	if err != nil {
+		return server.CreateResponse("500", "text/plain", "Error", "Template error")
 	}
 	return server.CreateResponse("200", "text/html", "OK",
 		result.String())
