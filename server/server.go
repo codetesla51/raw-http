@@ -1,12 +1,12 @@
 // Server package comment block:
 /*
-HTTP Server from Raw TCP Sockets
+HTTP/HTTPS Server from Raw TCP Sockets
 
 Author: Uthman Dev
 GitHub: https://github.com/codetesla51
 Repository: https://github.com/codetesla51/raw-http
 
-This package implements a basic HTTP server built directly on top of TCP sockets
+This package implements a basic HTTP/HTTPS server built directly on top of TCP sockets
 without using Go's net/http package. It demonstrates fundamental HTTP protocol
 handling including request parsing, routing, and response generation.
 
@@ -17,20 +17,21 @@ Features:
 - Static file serving with MIME type detection
 - Form data and JSON body parsing
 - Basic security protections (path traversal, request limits)
+- HTTPS/TLS support with certificate-based encryption
+- Concurrent connection handling with goroutines
+- Graceful error handling and recovery
 
 Limitations:
-- No HTTPS/TLS support
 - Basic error handling and recovery
 - Simple routing (no path parameters or wildcards)
 - Limited HTTP method and header support
-- Not suitable for production use
+- Not suitable for production use without enhancements
 
-This is primarily an educational project to understand HTTP internals
-and network programming fundamentals in Go.
+This is primarily an educational project to understand HTTP internals,
+TLS encryption, and network programming fundamentals in Go.
 */
 
 // ========================================================================
-
 package server
 
 import (
@@ -176,7 +177,7 @@ func (r *Router) RunConnection(conn net.Conn) {
 		var headerMap map[string]string
 		// === PARSE HEADERS ===
 		lines := strings.Split(headerSection, "\r\n")
-		if len(lines) == 0 {
+	if len(lines) == 0 {
 			log.Println("Invalid request")
 			return
 		}
@@ -184,21 +185,17 @@ func (r *Router) RunConnection(conn net.Conn) {
 		headerLines := lines[1:]
 		headerMap = parseHeaders(headerLines)
 		// Parse body if present
-		if len(requestParts) > 1 {
-			body = requestParts[1]
 			if len(requestParts) > 1 {
 				body = requestParts[1]
 				contentType := headerMap["Content-Type"]
 				if strings.Contains(contentType, "application/json") {
-
 					bodyMap = parseJSONBody(body)
-
 				} else {
 
 					bodyMap = parseKeyValuePairs(body)
 				}
 			}
-		}
+		
 		// === HANDLE CONTENT-LENGTH (READ REMAINING BODY IF NEEDED) ===
 		contentLengthStr := headerMap["Content-Length"]
 		if contentLengthStr != "" {
@@ -459,3 +456,4 @@ func parseJSONBody(body string) map[string]string {
 
 	return result
 }
+
