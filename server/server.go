@@ -1,4 +1,4 @@
-// Server package comment block:
+
 /*
 HTTP/HTTPS Server from Raw TCP Sockets
 
