@@ -1,61 +1,29 @@
-
-/*
-HTTP/HTTPS Server Example Application
-
-Author: Uthman Dev
-GitHub: https://github.com/codetesla51
-Repository: https://github.com/codetesla51/raw-http
-
-Example web application built on top of the custom HTTP server package.
-Demonstrates practical usage including template rendering, form handling,
-and basic authentication flow.
-
-Features:
-- Welcome page with dynamic content
-- Login form with POST handling
-- Template rendering with current time
-- Browser detection display
-- HTTPS support with TLS/SSL encryption
-
-The server supports both HTTP and HTTPS protocols. To enable HTTPS, place
-your TLS certificate (server.crt) and private key (server.key) in the
-application directory. The server will automatically detect these files
-and enable HTTPS on port 8443.
-
-This serves as both a demonstration of the HTTP server package capabilities
-and a reference implementation for building web applications on top of
-the custom server framework.
-
-Run with: go run main.go
-Server will start on http://localhost:8080
-If TLS certificates are present: https://localhost:8443
-
-Routes:
-- GET  /welcome - Welcome page with user info
-- GET  /login   - Login form
-- POST /login   - Login form submission
-*/
-
 package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
-	"github.com/codetesla51/raw-http/server"
 	"html/template"
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
+
+	"github.com/codetesla51/raw-http/server"
 )
 
 func main() {
-	// Create TCP listener on port 8080
+	// Graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Create TCP listener on port 8080 (fallback if busy)
 	port := 8080
 	var listener net.Listener
-	tlsPort := ":8443"
-	hasTLS := false
 	var err error
 	for {
 		addr := ":" + strconv.Itoa(port)
@@ -63,11 +31,14 @@ func main() {
 		if err == nil {
 			break
 		}
-		log.Printf("port %d currently in use trying %d..\n", port, port+1)
+		log.Printf("Port %d currently in use, trying %d...\n", port, port+1)
 		port++
 	}
 	defer listener.Close()
+	log.Printf("Server listening on http://localhost:%d\n", port)
 
+	// Setup HTTPS listener if certs exist
+	hasTLS := false
 	var tlsListener net.Listener
 	if fileExists("server.crt") && fileExists("server.key") {
 		cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
@@ -75,17 +46,18 @@ func main() {
 			log.Println("Failed to load TLS certificate:", err)
 		} else {
 			config := &tls.Config{Certificates: []tls.Certificate{cert}}
-			tlsListener, err = tls.Listen("tcp", tlsPort, config)
+			tlsListener, err = tls.Listen("tcp", ":8443", config)
 			if err != nil {
-				log.Println("Failed to listen on TLS port:", err)
+				log.Println("Failed to listen on TLS port 8443:", err)
 			} else {
 				hasTLS = true
 				defer tlsListener.Close()
-				log.Println("HTTPS enabled on port 8443")
+				log.Println("TLS listener successfully started on https://localhost:8443")
 			}
 		}
 	}
-	log.Printf("Server listening at Port: %d\n", port)
+
+	// Create router and register routes
 	router := server.NewRouter()
 	router.Register("GET", "/welcome", homeHandler)
 	router.Register("GET", "/hello", handleHello)
@@ -95,33 +67,51 @@ func main() {
 		return server.CreateResponse("200", "text/plain", "OK", "pong")
 	})
 
-if hasTLS {
-		log.Println("TLS listener successfully started on 8443")
+	// HTTP listener
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					log.Println("Error accepting connection:", err)
+					continue
+				}
+			}
+			go router.RunConnection(conn)
+		}
+	}()
+
+	// HTTPS listener
+	if hasTLS {
 		go func() {
 			for {
 				conn, err := tlsListener.Accept()
 				if err != nil {
-					log.Println("Error accepting TLS connection:", err)
-					continue
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						log.Println("Error accepting TLS connection:", err)
+						continue
+					}
 				}
 				go router.RunConnection(conn)
 			}
 		}()
 	}
-	// Accept connections in infinite loop
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Println("Error accepting connection:", err)
-			continue
-		}
-		// Handle each connection in its own goroutine
 
-		go router.RunConnection(conn)
-
+	// Wait for shutdown
+	<-ctx.Done()
+	log.Println("Shutting down server...")
+	listener.Close()
+	if hasTLS {
+		tlsListener.Close()
 	}
-	
-
+	time.Sleep(2 * time.Second)
+	log.Println("Server stopped.")
 }
 
 func homeHandler(req *server.Request) (response, status string) {
@@ -129,26 +119,31 @@ func homeHandler(req *server.Request) (response, status string) {
 	if err != nil {
 		return server.CreateResponse("500", "text/plain", "Error", "Could not load template")
 	}
+
 	currentTime := time.Now()
 	formattedTime := currentTime.Format("15:04:05")
+	currentDate := currentTime.Weekday().String()
+
 	data := struct {
 		Title   string
 		Name    string
 		Browser string
 		Time    string
+		Day     string
 	}{
 		Title:   "My Home Page",
 		Name:    "John Doe",
 		Browser: req.Browser,
 		Time:    formattedTime,
+		Day:     currentDate,
 	}
+
 	var result bytes.Buffer
 	err = t.Execute(&result, data)
 	if err != nil {
 		return server.CreateResponse("500", "text/plain", "Error", "Template error")
 	}
-	return server.CreateResponse("200", "text/html", "OK",
-		result.String())
+	return server.CreateResponse("200", "text/html", "OK", result.String())
 }
 
 func loginHandler(req *server.Request) (response, status string) {
@@ -158,21 +153,23 @@ func loginHandler(req *server.Request) (response, status string) {
 		if err != nil {
 			return server.CreateResponse("500", "text/plain", "Error", "Could not load template")
 		}
-		err = t.Execute(&result, nil)
+		t.Execute(&result, nil)
 		return server.CreateResponse("200", "text/html", "OK", result.String())
+	}
 
-	} else if req.Method == "POST" {
+	if req.Method == "POST" {
 		username := req.Body["username"]
 		password := req.Body["password"]
 		if username == "admin" && password == "secret" {
-			return server.CreateResponse("200", "text/html", "OK", "<h1>Login Successful!</h1><p>Welcome "+username+"!</p>")
-		} else {
-			return server.CreateResponse("200", "text/html", "OK", "<h1>Login Failed</h1><p>Wrong username or password</p>")
+			return server.CreateResponse("200", "text/html", "OK",
+				"<h1>Login Successful!</h1><p>Welcome "+username+"!</p>")
 		}
+		return server.CreateResponse("200", "text/html", "OK",
+			"<h1>Login Failed</h1><p>Wrong username or password</p>")
 	}
-	return server.CreateResponse("200", "text/html", "OK",
-		result.String())
+	return server.CreateResponse("200", "text/html", "OK", result.String())
 }
+
 func handleHello(req *server.Request) (response, status string) {
 	var result bytes.Buffer
 	t, err := template.ParseFiles("pages/hello.html")
@@ -183,9 +180,9 @@ func handleHello(req *server.Request) (response, status string) {
 	if err != nil {
 		return server.CreateResponse("500", "text/plain", "Error", "Template error")
 	}
-	return server.CreateResponse("200", "text/html", "OK",
-		result.String())
+	return server.CreateResponse("200", "text/html", "OK", result.String())
 }
+
 func fileExists(filename string) bool {
 	_, err := os.Stat(filename)
 	return err == nil
