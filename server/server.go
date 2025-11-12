@@ -54,14 +54,14 @@ import (
 var requestBufferPool = sync.Pool{
 	New: func() interface{} {
 		buf := make([]byte, 8192)
-		return &buf
+		return buf
 	},
 }
 
 var chunkBufferPool = sync.Pool{
 	New: func() interface{} {
 		buf := make([]byte, 256)
-		return &buf
+		return buf
 	},
 }
 
