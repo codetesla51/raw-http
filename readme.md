@@ -36,6 +36,47 @@ curl -X POST http://localhost:8080/login \
 - **Form & JSON parsing** - Handles both URL-encoded forms and JSON request bodies
 - **Security basics** - Path traversal protection and request limits
 - **HTTPS/TLS support** - Optional encrypted connections with certificate support
+- **Graceful shutdown** - Clean server termination with signal handling
+
+## Graceful Shutdown
+
+The server now supports graceful shutdown, allowing in-flight requests to complete before the server stops. The server listens for interrupt signals (Ctrl+C) and SIGTERM signals, making it safe to stop in production-like environments.
+
+### How It Works
+
+1. **Signal Detection** - Captures `SIGINT` (Ctrl+C) and `SIGTERM` signals
+2. **Stop Accepting Connections** - Listeners stop accepting new connections immediately
+3. **Grace Period** - Waits 2 seconds for active connections to complete
+4. **Clean Shutdown** - Properly closes both HTTP and HTTPS listeners
+
+### Usage
+
+```bash
+# Start the server
+go run main.go
+# Server listening on http://localhost:8080
+# TLS listener successfully started on https://localhost:8443
+
+# Press Ctrl+C to trigger graceful shutdown
+^C
+# Shutting down server...
+# Server stopped.
+```
+
+### Implementation Details
+
+The server uses Go's `signal.NotifyContext` to create a context that cancels when shutdown signals are received. Both HTTP and HTTPS listeners check this context and stop accepting new connections gracefully:
+
+```go
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+defer stop()
+
+// Listeners check ctx.Done() to stop accepting connections
+<-ctx.Done()
+log.Println("Shutting down server...")
+```
+
+This ensures that your application can be safely stopped without abruptly terminating active requests, preventing data loss or incomplete transactions.
 
 ## HTTPS Configuration
 
@@ -151,6 +192,7 @@ router.Register("GET", "/ping", func(req *server.Request) (string, string) {
 - **MIME Detection:** Comprehensive content-type handling for static files
 - **Memory Efficient:** Streams request bodies instead of full buffering
 - **TLS/SSL Layer:** Optional HTTPS encryption for secure connections
+- **Signal Handling:** Context-based graceful shutdown with proper cleanup
 
 ## Project Structure
 
@@ -180,6 +222,7 @@ Building from TCP sockets up provided insights into:
 - Go's networking primitives and goroutine-per-connection model
 - Template rendering and form data handling from scratch
 - The critical importance of proper connection reuse for performance
+- Signal handling and graceful shutdown patterns for reliable server termination
 
 ## Testing
 
