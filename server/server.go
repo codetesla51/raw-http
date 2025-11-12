@@ -1,4 +1,3 @@
-
 /*
 HTTP/HTTPS Server from Raw TCP Sockets
 
@@ -19,6 +18,7 @@ Features:
 - Basic security protections (path traversal, request limits)
 - HTTPS/TLS support with certificate-based encryption
 - Concurrent connection handling with goroutines
+- Memory-optimized buffer pooling for high performance
 - Graceful error handling and recovery
 
 Limitations:
@@ -31,10 +31,10 @@ This is primarily an educational project to understand HTTP internals,
 TLS encryption, and network programming fundamentals in Go.
 */
 
-// ========================================================================
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,8 +47,29 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+var requestBufferPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 8192)
+		return &buf
+	},
+}
+
+var chunkBufferPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 256)
+		return &buf
+	},
+}
+
+var responseBufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
 
 type Request struct {
 	Query   map[string]string
@@ -57,15 +78,13 @@ type Request struct {
 	Method  string
 	Path    string
 }
+
 type RouteHandler func(req *Request) (response, status string)
 
-// Router manages route registration and handling
 type Router struct {
 	routes map[string]map[string]RouteHandler
-	// method -> path -> handler
 }
 
-// NewRouter creates a new router instance
 func NewRouter() *Router {
 	return &Router{
 		routes: make(map[string]map[string]RouteHandler),
@@ -73,7 +92,6 @@ func NewRouter() *Router {
 }
 
 func init() {
-	// Basic web MIME types (most important)
 	mime.AddExtensionType(".html", "text/html")
 	mime.AddExtensionType(".htm", "text/html")
 	mime.AddExtensionType(".css", "text/css")
@@ -83,7 +101,6 @@ func init() {
 	mime.AddExtensionType(".xml", "application/xml")
 	mime.AddExtensionType(".csv", "text/csv")
 
-	// Images
 	mime.AddExtensionType(".jpg", "image/jpeg")
 	mime.AddExtensionType(".jpeg", "image/jpeg")
 	mime.AddExtensionType(".png", "image/png")
@@ -93,35 +110,30 @@ func init() {
 	mime.AddExtensionType(".ico", "image/x-icon")
 	mime.AddExtensionType(".bmp", "image/bmp")
 
-	// Video
 	mime.AddExtensionType(".mp4", "video/mp4")
 	mime.AddExtensionType(".webm", "video/webm")
 	mime.AddExtensionType(".avi", "video/x-msvideo")
 	mime.AddExtensionType(".mov", "video/quicktime")
 	mime.AddExtensionType(".wmv", "video/x-ms-wmv")
 
-	// Audio
 	mime.AddExtensionType(".mp3", "audio/mpeg")
 	mime.AddExtensionType(".wav", "audio/wav")
 	mime.AddExtensionType(".ogg", "audio/ogg")
 	mime.AddExtensionType(".m4a", "audio/mp4")
 	mime.AddExtensionType(".flac", "audio/flac")
 
-	// Fonts
 	mime.AddExtensionType(".woff", "font/woff")
 	mime.AddExtensionType(".woff2", "font/woff2")
 	mime.AddExtensionType(".ttf", "font/ttf")
 	mime.AddExtensionType(".otf", "font/otf")
 	mime.AddExtensionType(".eot", "application/vnd.ms-fontobject")
 
-	// Documents
 	mime.AddExtensionType(".pdf", "application/pdf")
 	mime.AddExtensionType(".doc", "application/msword")
 	mime.AddExtensionType(".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 	mime.AddExtensionType(".xls", "application/vnd.ms-excel")
 	mime.AddExtensionType(".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-	// Archives
 	mime.AddExtensionType(".zip", "application/zip")
 	mime.AddExtensionType(".tar", "application/x-tar")
 	mime.AddExtensionType(".gz", "application/gzip")
@@ -130,130 +142,122 @@ func init() {
 }
 
 func readHTTPRequest(conn net.Conn) (string, error) {
-	var headerBuffer []byte
+	bufPtr := requestBufferPool.Get().(*[]byte)
+	headerBuffer := (*bufPtr)[:0]
+	
+	defer func() {
+		if cap(headerBuffer) <= 16384 {
+			requestBufferPool.Put(bufPtr)
+		}
+	}()
+
 	maxHeaderSize := 8192
 	timeout := time.Now().Add(10 * time.Second)
-	// Read request in small chunks until we find end of headers
+
 	for {
 		conn.SetReadDeadline(timeout)
 		if len(headerBuffer) > maxHeaderSize {
 			return "", errors.New("headers too large")
 		}
-		chunk := make([]byte, 256)
+		
+		chunkPtr := chunkBufferPool.Get().(*[]byte)
+		chunk := *chunkPtr
+		
 		n, err := conn.Read(chunk)
 		if err != nil {
+			chunkBufferPool.Put(chunkPtr)
 			return "", err
 		}
+		
 		headerBuffer = append(headerBuffer, chunk[:n]...)
+		chunkBufferPool.Put(chunkPtr)
 
-		// Check if we have complete headers (marked by \r\n\r\n)
 		if strings.Contains(string(headerBuffer), "\r\n\r\n") {
 			break
 		}
 	}
 
 	return string(headerBuffer), nil
-
 }
 
 func (r *Router) RunConnection(conn net.Conn) {
 	defer conn.Close()
 
 	for {
-		// === READ HTTP REQUEST USING CHUNKED READING ===
-
 		request, err := readHTTPRequest(conn)
 		if err != nil {
-		  //Debug to see if it time's out correctly 
-	//		log.Println("Error reading request:", err)
 			return
 		}
 
-		// === SPLIT HEADERS AND BODY ===
 		requestParts := strings.SplitN(request, "\r\n\r\n", 2)
 		headerSection := requestParts[0]
 		body := ""
 		var bodyMap map[string]string
 		var headerMap map[string]string
-		// === PARSE HEADERS ===
+
 		lines := strings.Split(headerSection, "\r\n")
-	if len(lines) == 0 {
+		if len(lines) == 0 {
 			log.Println("Invalid request")
 			return
 		}
 		firstLine := lines[0]
 		headerLines := lines[1:]
 		headerMap = parseHeaders(headerLines)
-		// Parse body if present
-			if len(requestParts) > 1 {
-				body = requestParts[1]
-				contentType := headerMap["Content-Type"]
-				if strings.Contains(contentType, "application/json") {
-					bodyMap = parseJSONBody(body)
-				} else {
 
-					bodyMap = parseKeyValuePairs(body)
-				}
+		if len(requestParts) > 1 {
+			body = requestParts[1]
+			contentType := headerMap["Content-Type"]
+			if strings.Contains(contentType, "application/json") {
+				bodyMap = parseJSONBody(body)
+			} else {
+				bodyMap = parseKeyValuePairs(body)
 			}
-		
-		// === HANDLE CONTENT-LENGTH (READ REMAINING BODY IF NEEDED) ===
+		}
+
 		contentLengthStr := headerMap["Content-Length"]
 		if contentLengthStr != "" {
 			contentLength, err := strconv.Atoi(contentLengthStr)
 			if err == nil && len(body) < contentLength {
 				remainingBytes := contentLength - len(body)
-
-				// Create buffer for remaining data
 				remainingBuffer := make([]byte, remainingBytes)
-
-				// Read the exact amount needed
 				_, err := conn.Read(remainingBuffer)
 				if err != nil {
 					log.Println("Error reading remaining body:", err)
 					return
 				}
-
-				// Append to existing body
 				body += string(remainingBuffer)
 			}
 		}
 
-		// === DETECT BROWSER FROM USER-AGENT ===
 		var browserName string
 		browserName = detectBrowser(headerMap["User-Agent"])
 
-		// === PARSE REQUEST LINE ===
 		method, path, err := parseRequestLine(firstLine)
 		if err != nil {
 			return
 		}
 
-		// === PARSE PATH AND QUERY PARAMETERS ===
 		fullPath := strings.Split(path, "?")
-		cleanPath := fullPath[0] // Path without query params
+		cleanPath := fullPath[0]
 		var queryPath string
 		var queryMap map[string]string
 
 		if len(fullPath) > 1 {
 			queryPath = fullPath[1]
 			if queryPath != "" {
-				// Parse query parameters (key=value&key2=value2)
 				queryMap = parseKeyValuePairs(queryPath)
 			}
 		}
 
-		// === ROUTING AND RESPONSE GENERATION ===
 		var response, status string
 		var filePath string
 
-		// Determine file path for static files
 		rawPath := cleanPath
 		cleanedRawPath := filepath.Clean(rawPath)
 		if strings.Contains(cleanedRawPath, "..") {
 			response, status = CreateResponse("403", "text/plain", "Forbidden", "Access denied")
 			goto sendResponse
 		} else {
-			// Safe to add pages prefix
 			if cleanPath == "/" {
 				filePath = "pages/index.html"
 			} else {
@@ -273,8 +277,6 @@ func (r *Router) RunConnection(conn net.Conn) {
 			response, status = r.Handle(method, cleanPath, queryMap, bodyMap, browserName)
 		}
 
-		// === SEND RESPONSE ===
-
 	sendResponse:
 		switch status {
 		case "200":
@@ -292,20 +294,34 @@ func (r *Router) RunConnection(conn net.Conn) {
 		if headerMap["Connection"] == "close" {
 			break
 		}
-
 	}
 }
 
-// CreateResponse builds a complete HTTP response with proper headers
 func CreateResponse(statusCode, contentType, statusMessage, body string) (string, string) {
-	return "HTTP/1.1 " + statusCode + " " + statusMessage +
-		"\r\nContent-Type: " + contentType +
-		"\r\nConnection: keep-alive" +
-		"\r\nContent-Length: " + strconv.Itoa(len(body)) +
-		"\r\n\r\n" + body, statusCode
+	buf := responseBufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	
+	defer func() {
+		if buf.Cap() <= 16384 {
+			responseBufferPool.Put(buf)
+		}
+	}()
+
+	buf.WriteString("HTTP/1.1 ")
+	buf.WriteString(statusCode)
+	buf.WriteString(" ")
+	buf.WriteString(statusMessage)
+	buf.WriteString("\r\nContent-Type: ")
+	buf.WriteString(contentType)
+	buf.WriteString("\r\nConnection: keep-alive")
+	buf.WriteString("\r\nContent-Length: ")
+	buf.WriteString(strconv.Itoa(len(body)))
+	buf.WriteString("\r\n\r\n")
+	buf.WriteString(body)
+
+	return buf.String(), statusCode
 }
 
-// fileExists checks if a file exists at the given path
 func fileExists(filePath string) bool {
 	_, err := os.Stat(filePath)
 	if err == nil {
@@ -318,16 +334,13 @@ func fileExists(filePath string) bool {
 	return false
 }
 
-// getFormValue retrieves a value from form data with a default fallback
 func getFormValue(bodyMap map[string]string, key string, defaultValue string) string {
-
 	if value, exists := bodyMap[key]; exists {
 		return value
 	}
 	return defaultValue
 }
 
-// serve404 returns a 404 Not Found response, serving custom 404 page if available
 func serve404() (string, string) {
 	cleanedPath := filepath.Clean("pages/404.html")
 	content, success := readFileContent(cleanedPath)
@@ -374,13 +387,11 @@ func parseKeyValuePairs(data string) map[string]string {
 	pairs := strings.Split(data, "&")
 	for _, pair := range pairs {
 		parts := strings.Split(pair, "=")
-
 		if len(parts) == 2 {
 			key := parts[0]
 			value := parts[1]
 			decodedKey := safeURLDecode(key)
 			decodedValue := safeURLDecode(value)
-
 			resultMap[decodedKey] = decodedValue
 		}
 	}
@@ -415,7 +426,6 @@ func (r *Router) Register(method, path string, handler RouteHandler) {
 	r.routes[method][path] = handler
 }
 
-// Handle processes a request through the registered routes
 func (r *Router) Handle(method, cleanPath string, queryMap, bodyMap map[string]string, browserName string) (response, status string) {
 	if methodRoutes, exists := r.routes[method]; exists {
 		if handler, exists := methodRoutes[cleanPath]; exists {
@@ -441,6 +451,7 @@ func getContentType(filePath string) string {
 	}
 	return contentType
 }
+
 func parseJSONBody(body string) map[string]string {
 	var jsonData map[string]any
 	result := make(map[string]string)
@@ -456,4 +467,3 @@ func parseJSONBody(body string) map[string]string {
 
 	return result
 }
-
