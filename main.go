@@ -1,4 +1,4 @@
-// Main package comment block:
+
 /*
 HTTP/HTTPS Server Example Application
 
@@ -95,19 +95,7 @@ func main() {
 		return server.CreateResponse("200", "text/plain", "OK", "pong")
 	})
 
-	// Accept connections in infinite loop
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Println("Error accepting connection:", err)
-			continue
-		}
-		// Handle each connection in its own goroutine
-
-		go router.RunConnection(conn)
-
-	}
-	if hasTLS {
+if hasTLS {
 		log.Println("TLS listener successfully started on 8443")
 		go func() {
 			for {
@@ -120,6 +108,19 @@ func main() {
 			}
 		}()
 	}
+	// Accept connections in infinite loop
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Error accepting connection:", err)
+			continue
+		}
+		// Handle each connection in its own goroutine
+
+		go router.RunConnection(conn)
+
+	}
+	
 
 }
 
