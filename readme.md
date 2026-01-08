@@ -77,10 +77,10 @@ This eliminates unnecessary allocations in the hot path.
 
 | Concurrency | RPS | Avg Response Time | Status |
 |-------------|-----|-------------------|--------|
-| **c=1** | **~12,000** | **<0.1ms** | Peak 🔥 |
+| **c=1** | **~12,000** | **<0.1ms** | Peak |
 | **c=10** | **~10,000** | **1.0ms** | Optimal |
 | **c=100** | **~10,000** | **10ms** | Good |
-| c=1000 | 307 | 3,256ms | **Failure** ❌ |
+| c=1000 | 307 | 3,256ms | **Failure** |
 
 **Key findings:**
 - **Sweet spot: 10-100 concurrent connections** - Consistent 10k RPS
@@ -93,9 +93,9 @@ This eliminates unnecessary allocations in the hot path.
 | Stage | RPS | Improvement |
 |-------|-----|-------------|
 | Initial string-based | ~7,000 | Baseline |
-| Added small buffer pools (256B) | ~4,000 | **-43%** ❌ (pools hurt!) |
-| Removed small pools, kept large (8KB) | ~9,400 | **+34%** ✅ |
-| Full bytes conversion | **~10,000** | **+43%** ✅ |
+| Added small buffer pools (256B) | ~4,000 | **-43%** (pools hurt) |
+| Removed small pools, kept large (8KB) | ~9,400 | **+34%** |
+| Full bytes conversion | **~10,000** | **+43%** |
 
 **Total improvement: +43% from strategic optimization**
 
