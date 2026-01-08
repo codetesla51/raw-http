@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"runtime/debug"
 )
 var chunkBufferPool = sync.Pool{
     New: func() interface{} {
@@ -154,7 +155,20 @@ func readHTTPRequest(conn net.Conn) ([]byte, error) {
 
 func (r *Router) RunConnection(conn net.Conn) {
 	defer conn.Close()
-
+defer func() {
+        if err := recover(); err != nil {
+            log.Printf("PANIC recovered: %v\n%s", err, debug.Stack())
+            
+            errorResponse, _ := CreateResponseBytes(
+                "500",
+                "text/plain",
+                "Internal Server Error",
+                []byte("Internal server error occurred"),
+            )
+            
+            conn.Write(errorResponse)
+        }
+    }()
 	for {
 		requestData, err := readHTTPRequest(conn)
 		if err != nil {

@@ -66,6 +66,9 @@ func main() {
 	router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
 		return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
 	})
+	router.Register("GET", "/panic", func(req *server.Request) ([]byte, string) {
+    panic("test panic") 
+})
 
 	// HTTP listener
 	go func() {

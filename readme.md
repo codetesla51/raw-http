@@ -34,11 +34,61 @@ curl -X POST http://localhost:8080/login \
 - **Template rendering** - Supports Go's `html/template` for dynamic content
 - **Connection management** - Keep-alive support with proper connection reuse
 - **Form & JSON parsing** - Handles both URL-encoded forms and JSON request bodies
+- **Panic recovery** - Graceful handler panic recovery with stack trace logging
 - **Security basics** - Path traversal protection and request limits
 - **HTTPS/TLS support** - Optional encrypted connections with certificate support
 - **Graceful shutdown** - Clean server termination with signal handling
 - **Bytes-optimized processing** - Zero-copy parsing with strategic buffer pooling
 - **High-performance networking** - Sub-millisecond response times under optimal load
+
+## Panic Recovery
+
+The server includes robust panic recovery middleware that prevents handler panics from crashing the entire server.
+
+### How It Works
+
+Every incoming connection is wrapped with a `defer/recover` mechanism that:
+1. **Catches panics** - Recovers from any panic in handler code
+2. **Logs stack traces** - Captures full stack trace for debugging
+3. **Returns 500 error** - Sends proper HTTP error response to client
+4. **Keeps server alive** - Connection pool remains healthy
+
+```go
+defer func() {
+    if r := recover(); r != nil {
+        log.Printf("PANIC recovered: %v\n%s", r, debug.Stack())
+        // Server continues running
+    }
+}()
+```
+
+### Benefits
+
+- **Server stability** - A single handler panic won't crash your server
+- **Request isolation** - Panic in one request doesn't affect others
+- **Debug visibility** - Full stack traces logged for troubleshooting
+- **Client experience** - Returns proper 500 error instead of connection drop
+- **Production ready** - Handles unexpected errors gracefully
+
+### Testing Panic Recovery
+
+```bash
+# Trigger a test panic
+curl http://localhost:8080/panic
+
+# Server logs the panic but continues running
+# Returns: HTTP 500 Internal Server Error
+```
+
+The server will log something like:
+```
+2026/01/08 09:00:12 PANIC recovered: test panic
+goroutine 35 [running]:
+runtime/debug.Stack()
+...
+```
+
+But the server stays alive and continues handling requests.
 
 ## Performance Optimization Journey
 
@@ -181,6 +231,7 @@ router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
 - **Bytes-first processing:** Zero-copy HTTP parsing with `[]byte` operations
 - **Strategic buffer pooling:** `sync.Pool` for large buffers (8KB+), direct allocation for small ones
 - **TCP connection pooling:** HTTP/1.1 keep-alive implementation
+- **Panic recovery middleware:** Defer/recover pattern preventing handler crashes
 - **Goroutine-per-connection:** Leverages Go's concurrency model
 - **Custom HTTP parser:** Zero-dependency request parsing
 - **MIME detection:** Comprehensive content-type handling
@@ -212,6 +263,7 @@ Building from TCP sockets up provided deep insights into:
 - **Performance optimization** - When to pool, when to allocate, profiling-driven development
 - **Memory management** - Buffer reuse strategies and GC pressure reduction
 - **Bytes vs strings** - The performance cost of string conversions
+- **Error handling** - Panic recovery patterns and production reliability
 - **Go's networking primitives** - `net` package, goroutines, and concurrency patterns
 - **TLS/SSL encryption** - Certificate management and secure connections
 - **Security fundamentals** - Path traversal, DoS protection, input validation
@@ -243,6 +295,18 @@ ab -n 10000 -c 1000 -k http://localhost:8080/ping
 
 **Note:** Performance degrades significantly above c=100 due to system limits. For production workloads requiring >100 concurrent connections, use Go's `net/http` package.
 
+### Testing Panic Recovery
+
+```bash
+# Test that panics don't crash the server
+curl http://localhost:8080/panic
+
+# Server should return 500 but stay alive
+# Try another request to verify
+curl http://localhost:8080/ping
+# Should return: pong
+```
+
 ## Limitations
 
 This is a learning project demonstrating HTTP fundamentals:
@@ -258,7 +322,7 @@ This is a learning project demonstrating HTTP fundamentals:
 
 ## Why Build This?
 
-Understanding what happens beneath web frameworks - HTTP parsing, connection management, TLS encryption, memory optimization, and networking fundamentals. 
+Understanding what happens beneath web frameworks - HTTP parsing, connection management, TLS encryption, memory optimization, error recovery, and networking fundamentals. 
 
 The optimization journey (7k → 4k → 10k RPS) demonstrates how low-level implementation choices dramatically impact performance, and how measurement-driven optimization is essential.
 
@@ -269,6 +333,7 @@ The optimization journey (7k → 4k → 10k RPS) demonstrates how low-level impl
 - `/login` - Form handling example
 - `/hello` - About page
 - `/ping` - API endpoint (used for benchmarking)
+- `/panic` - Test panic recovery (returns 500 but server stays alive)
 
 ---
 
