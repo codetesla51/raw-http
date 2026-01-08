@@ -63,8 +63,8 @@ func main() {
 	router.Register("GET", "/hello", handleHello)
 	router.Register("GET", "/login", loginHandler)
 	router.Register("POST", "/login", loginHandler)
-	router.Register("GET", "/ping", func(req *server.Request) (string, string) {
-		return server.CreateResponse("200", "text/plain", "OK", "pong")
+	router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
+		return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
 	})
 
 	// HTTP listener
@@ -114,10 +114,10 @@ func main() {
 	log.Println("Server stopped.")
 }
 
-func homeHandler(req *server.Request) (response, status string) {
+func homeHandler(req *server.Request) ([]byte, string) {
 	t, err := template.ParseFiles("pages/welcome.html")
 	if err != nil {
-		return server.CreateResponse("500", "text/plain", "Error", "Could not load template")
+		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Could not load template"))
 	}
 
 	currentTime := time.Now()
@@ -141,46 +141,46 @@ func homeHandler(req *server.Request) (response, status string) {
 	var result bytes.Buffer
 	err = t.Execute(&result, data)
 	if err != nil {
-		return server.CreateResponse("500", "text/plain", "Error", "Template error")
+		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Template error"))
 	}
-	return server.CreateResponse("200", "text/html", "OK", result.String())
+	return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
 }
 
-func loginHandler(req *server.Request) (response, status string) {
+func loginHandler(req *server.Request) ([]byte, string) {
 	var result bytes.Buffer
 	if req.Method == "GET" {
 		t, err := template.ParseFiles("pages/login.html")
 		if err != nil {
-			return server.CreateResponse("500", "text/plain", "Error", "Could not load template")
+			return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Could not load template"))
 		}
 		t.Execute(&result, nil)
-		return server.CreateResponse("200", "text/html", "OK", result.String())
+		return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
 	}
 
 	if req.Method == "POST" {
 		username := req.Body["username"]
 		password := req.Body["password"]
 		if username == "admin" && password == "secret" {
-			return server.CreateResponse("200", "text/html", "OK",
-				"<h1>Login Successful!</h1><p>Welcome "+username+"!</p>")
+			response := "<h1>Login Successful!</h1><p>Welcome " + username + "!</p>"
+			return server.CreateResponseBytes("200", "text/html", "OK", []byte(response))
 		}
-		return server.CreateResponse("200", "text/html", "OK",
-			"<h1>Login Failed</h1><p>Wrong username or password</p>")
+		return server.CreateResponseBytes("200", "text/html", "OK",
+			[]byte("<h1>Login Failed</h1><p>Wrong username or password</p>"))
 	}
-	return server.CreateResponse("200", "text/html", "OK", result.String())
+	return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
 }
 
-func handleHello(req *server.Request) (response, status string) {
+func handleHello(req *server.Request) ([]byte, string) {
 	var result bytes.Buffer
 	t, err := template.ParseFiles("pages/hello.html")
 	if err != nil {
-		return server.CreateResponse("500", "text/plain", "Error", "Could not load template")
+		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Could not load template"))
 	}
 	err = t.Execute(&result, nil)
 	if err != nil {
-		return server.CreateResponse("500", "text/plain", "Error", "Template error")
+		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Template error"))
 	}
-	return server.CreateResponse("200", "text/html", "OK", result.String())
+	return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
 }
 
 func fileExists(filename string) bool {
