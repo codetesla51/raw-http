@@ -1,5 +1,3 @@
-
-
 package server
 
 import (
@@ -7,25 +5,26 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/fatih/color"
 	"log"
 	"mime"
 	"net"
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
-	"runtime/debug"
-)
-var chunkBufferPool = sync.Pool{
-    New: func() interface{} {
-        buf := make([]byte, 4096)
-        return &buf
-    },
-}
 
+	"github.com/fatih/color"
+)
+
+var chunkBufferPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 4096)
+		return &buf
+	},
+}
 
 var requestBufferPool = sync.Pool{
 	New: func() interface{} {
@@ -112,63 +111,64 @@ func init() {
 
 // readHTTPRequest reads HTTP request headers as bytes
 func readHTTPRequest(conn net.Conn) ([]byte, error) {
-    bufPtr := requestBufferPool.Get().(*[]byte)
-    headerBuffer := (*bufPtr)[:0]
+	bufPtr := requestBufferPool.Get().(*[]byte)
+	headerBuffer := (*bufPtr)[:0]
 
-    defer func() {
-        if cap(headerBuffer) <= 16384 {
-            requestBufferPool.Put(bufPtr)
-        }
-    }()
+	defer func() {
+		if cap(headerBuffer) <= 16384 {
+			requestBufferPool.Put(bufPtr)
+		}
+	}()
 
-    maxHeaderSize := 8192
-    endMarker := []byte("\r\n\r\n")
+	maxHeaderSize := 8192
+	endMarker := []byte("\r\n\r\n")
 
-    for {
-        conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+	for {
+		conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 
-        if len(headerBuffer) > maxHeaderSize {
-            return nil, errors.New("headers too large")
-        }
+		if len(headerBuffer) > maxHeaderSize {
+			return nil, errors.New("headers too large")
+		}
 
-        chunkPtr := chunkBufferPool.Get().(*[]byte)
-        chunk := *chunkPtr
+		chunkPtr := chunkBufferPool.Get().(*[]byte)
+		chunk := *chunkPtr
 
-        n, err := conn.Read(chunk)
-        if err != nil {
-            chunkBufferPool.Put(chunkPtr)
-            return nil, err
-        }
+		n, err := conn.Read(chunk)
+		if err != nil {
+			chunkBufferPool.Put(chunkPtr)
+			return nil, err
+		}
 
-        headerBuffer = append(headerBuffer, chunk[:n]...)
-        chunkBufferPool.Put(chunkPtr)
+		headerBuffer = append(headerBuffer, chunk[:n]...)
+		chunkBufferPool.Put(chunkPtr)
 
-        if bytes.Contains(headerBuffer, endMarker) {
-            break
-        }
-    }
+		if bytes.Contains(headerBuffer, endMarker) {
+			break
+		}
+	}
 
-    result := make([]byte, len(headerBuffer))
-    copy(result, headerBuffer)
-    return result, nil
+	result := make([]byte, len(headerBuffer))
+	copy(result, headerBuffer)
+	return result, nil
 }
 
 func (r *Router) RunConnection(conn net.Conn) {
-	defer conn.Close()
-defer func() {
-        if err := recover(); err != nil {
-            log.Printf("PANIC recovered: %v\n%s", err, debug.Stack())
-            
-            errorResponse, _ := CreateResponseBytes(
-                "500",
-                "text/plain",
-                "Internal Server Error",
-                []byte("Internal server error occurred"),
-            )
-            
-            conn.Write(errorResponse)
-        }
-    }()
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("PANIC recovered: %v\n%s", err, debug.Stack())
+
+			errorResponse, _ := CreateResponseBytes(
+				"500",
+				"text/plain",
+				"Internal Server Error",
+				[]byte("Internal server error occurred"),
+			)
+
+			conn.Write(errorResponse)
+			conn.Close()
+		}
+	}()
 	for {
 		requestData, err := readHTTPRequest(conn)
 		if err != nil {
@@ -207,11 +207,16 @@ defer func() {
 			if err == nil && len(bodyData) < contentLength {
 				remainingBytes := contentLength - len(bodyData)
 				remainingBuffer := make([]byte, remainingBytes)
-				n, err := conn.Read(remainingBuffer)
-				if err != nil {
-					return
+				totalRead := 0
+				for totalRead < remainingBytes {
+					n, err := conn.Read(remainingBuffer[totalRead:])
+					if err != nil {
+						return
+					}
+					totalRead += n
 				}
-				bodyData = append(bodyData, remainingBuffer[:n]...)
+
+				bodyData = append(bodyData, remainingBuffer[:totalRead]...)
 			}
 		}
 
