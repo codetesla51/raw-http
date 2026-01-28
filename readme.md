@@ -1,124 +1,162 @@
-# HTTP/HTTPS Server from Scratch
+# raw-http
 
-A lightweight HTTP/HTTPS server built from raw TCP sockets in Go to understand HTTP protocol internals and network programming fundamentals. No frameworks - just socket programming, HTTP parsing, and TLS encryption.
+High-performance HTTP/HTTPS server built from raw TCP sockets in Go. No frameworks, no abstractions - just socket I/O, protocol parsing, and efficient request handling.
 
-STATUS: In Development
+**Status:** Active Development
+**Performance:** 9,800-11,600 RPS (benchmark results below)
+**Production Ready:** No - use for learning, experimentation, or embedded scenarios only
 
-PERFORMANCE: 8,900 - 11,600 RPS depending on load and request type
-
-## Quick Start
+## Installation
 
 ```bash
 git clone https://github.com/codetesla51/raw-http
 cd raw-http
 go mod tidy
-go run main.go
-
-# Server starts on http://localhost:8080
-# HTTPS available on https://localhost:8443 (if certificates present)
+go build
+./raw-http
 ```
 
-Try it:
-```bash
-curl http://localhost:8080/ping
-# Returns: pong
+Server listens on `http://localhost:8080` by default (auto-increments if busy).
+TLS on `https://localhost:8443` (if `server.crt` and `server.key` present).
 
-curl -X POST http://localhost:8080/login \
-  -d "username=admin&password=secret"
-# Returns: Login successful HTML page
+## Usage
+
+### Basic Server Setup
+
+```go
+package main
+
+import "github.com/codetesla51/raw-http/server"
+
+func main() {
+    // Default configuration (30s timeout, 10MB max body)
+    router := server.NewRouter()
+    
+    // Or use custom configuration
+    cfg := server.DefaultConfig()
+    cfg.ReadTimeout = 60 * time.Second
+    cfg.MaxBodySize = 50 * 1024 * 1024  // 50MB
+    cfg.EnableLogging = true
+    router := server.NewRouterWithConfig(cfg)
+    
+    // Register routes
+    router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
+        return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
+    })
+}
 ```
+
+### Configuration
+
+Configuration is set via `Config` struct with `DefaultConfig()` providing sensible defaults:
+
+```go
+type Config struct {
+    ReadTimeout     time.Duration  // Max time to wait for request (default: 30s)
+    WriteTimeout    time.Duration  // Max time to send response (default: 30s)
+    IdleTimeout     time.Duration  // Max time between requests (default: 120s)
+    MaxHeaderSize   int            // Max header bytes, rejects larger (default: 8192)
+    MaxBodySize     int64          // Max request body, rejects larger (default: 10MB)
+    EnableKeepAlive bool           // Allow connection reuse (default: true)
+    EnableLogging   bool           // Log requests to stdout (default: false)
+}
+```
+
+Create custom configs and pass to `NewRouterWithConfig(cfg)`. The config object applies to all connections and routes - it controls defaults only, not runtime behavior.
 
 ## Features
 
-- **Raw TCP handling** - Parses HTTP requests directly from socket connections
-- **Custom routing** - Simple router with method and path matching  
-- **Static file serving** - Serves files from `pages/` with proper MIME types
-- **Template rendering** - Supports Go's `html/template` for dynamic content
-- **Connection management** - Keep-alive support with proper connection reuse
-- **Form & JSON parsing** - Handles both URL-encoded forms and JSON request bodies
-- **Panic recovery** - Graceful handler panic recovery with stack trace logging
-- **Security basics** - Path traversal protection and request limits
-- **HTTPS/TLS support** - Optional encrypted connections with certificate support
-- **Graceful shutdown** - Clean server termination with signal handling
-- **Bytes-optimized processing** - Zero-copy parsing with strategic buffer pooling
-- **High-performance networking** - Optimized for low-latency request handling
-- **Configurable performance** - Timeouts, logging toggle, keep-alive control
+- Raw TCP socket handling with HTTP/1.1 protocol compliance
+- Custom routing engine (method + path matching)
+- Keep-alive connection support (configurable)
+- Static file serving with MIME type detection
+- Form data and JSON request parsing
+- Request context (headers, query parameters, body)
+- Panic recovery (handlers can't crash the server)
+- Path traversal protection
+- HTTPS/TLS support (optional, certificate-based)
+- Graceful shutdown with signal handling
+- Buffer pooling for memory efficiency
+- Configurable timeouts and size limits
 
-## Benchmark Results (January 2026)
+## Performance
 
-All benchmarks run with keep-alive enabled on 8-core system.
+Benchmark results on 8-core system with keep-alive enabled.
 
-### Sweet Spot Performance
-```
-100 concurrent connections, 10k requests (GET /ping)
-RPS: 9,818 requests/second
-Response time: 10.2ms mean
-Failures: 0
-```
+| Scenario | Concurrency | Requests | RPS | Response Time | Status |
+|----------|-------------|----------|-----|---------------|--------|
+| Baseline | 100 | 10k | 9,818 | 10.2ms | Stable |
+| Sustained | 200 | 50k | 9,713 | 20.6ms | Stable |
+| High Load | 500 | 100k | 11,635 | 43ms | Stable |
+| Extreme | 1,000 | 100k | 11,303 | 88.5ms | Stable |
+| Stress | 5,000 | 100k | 8,930 | 559ms | Degraded |
+| POST (body) | 100 | 10k | 6,617 | 15.1ms | 35% slower |
+| Static Files | 100 | 10k | 6,349 | 15.8ms | Disk I/O |
 
-### Sustained Load
-```
-200 concurrent connections, 50k requests (GET /ping)
-RPS: 9,713 requests/second
-Response time: 20.6ms mean
-Failures: 0
-Status: Stable
-```
+Peak throughput: **11,635 RPS** (500 concurrent connections)
+Optimal latency: **9,818 RPS** at 100 concurrent connections
+Breaking point: ~5,000 concurrent connections (OS file descriptor limits)
+Zero failures: Up to 5,000 concurrent connections
 
-### High Concurrency
-```
-500 concurrent connections, 100k requests (GET /ping)
-RPS: 11,635 requests/second (peak)
-Response time: 43ms mean
-Failures: 0
-```
+GET requests on simple handlers (like /ping) are fastest. POST requests and file I/O are 35% slower due to body/disk overhead.
 
-### Extreme Load
-```
-1000 concurrent connections, 100k requests (GET /ping)
-RPS: 11,303 requests/second
-Response time: 88.5ms mean
-Failures: 0
-Status: Still stable, minimal degradation
-```
+## Architecture
 
-### Stress Test
-```
-5000 concurrent connections, 100k requests (GET /ping)
-RPS: 8,930 requests/second
-Response time: 559ms mean
-Failures: 0
-Status: Degraded but recovers - handling at OS limits
-Breaking point: Yes, approaching file descriptor limits on test machine
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design, Go concepts, and implementation details.
+
+Structure:
+- `main.go` - Entry point, route registration
+- `server/router.go` - Connection handling, routing logic
+- `server/request.go` - HTTP request parsing
+- `server/response.go` - HTTP response formatting
+- `server/config.go` - Configuration and defaults
+- `server/static.go` - File serving utilities
+- `server/pool.go` - Memory buffer pooling
+- `server/mime.go` - Content-type mapping
+- `server/logging.go` - Request logging (disabled by default)
+
+## Testing
+
+Run tests:
+```bash
+go test ./server/...
 ```
 
-### POST Requests
-```
-100 concurrent connections, 10k POST requests (with body)
-RPS: 6,617 requests/second
-Response time: 15.1ms mean
-Failures: 0
-Note: ~35% slower than GET due to body parsing
-```
+Run benchmarks:
+```bash
+# Moderate load
+ab -n 10000 -c 100 -k http://localhost:8080/ping
 
-### Static File Serving
-```
-100 concurrent connections, 10k requests (index.html)
-RPS: 6,349 requests/second
-Response time: 15.8ms mean
-Failures: 0
-Note: Similar to POST - disk I/O overhead
+# Heavy load
+ab -n 100000 -c 500 -k http://localhost:8080/ping
 ```
 
-## Performance Characteristics
+## Not Production Ready
 
-Maximum RPS: 11,635 (at 500 concurrent connections)
-Optimal RPS: 9,818 (at 100 concurrent connections - lowest latency)
-Breaking point: 5,000+ concurrent connections (OS file descriptor limits)
-Zero failures up to 5,000 concurrent connections
+This project is suitable for:
+- Learning HTTP protocol mechanics
+- Embedded servers in tools and utilities
+- Experimentation with network programming
+- Educational purposes
 
-Fastest endpoints: Simple in-memory handlers (/ping)
-Slowest endpoints: File I/O (static files), body parsing (POST requests)
+Do not use for:
+- Public-facing web services
+- Mission-critical applications
+- Handling untrusted input at scale
+- Replacing established web servers (nginx, Apache, Go's net/http)
+
+Production use requires:
+- Request logging and metrics
+- Security hardening and audit
+- Connection pooling and limits
+- Advanced caching strategies
+- Comprehensive error handling
+- Load testing under your specific workload
+
+## License
+
+MIT
+
 
 ## Panic Recovery
 
