@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -197,6 +198,12 @@ func (r *Router) RunConnection(conn net.Conn) {
 		firstLine := headerLines[0]
 		remainingHeaders := headerLines[1:]
 
+		// Parse request line
+		method, pathBytes, err := parseRequestLineFromBytes(firstLine)
+		if err != nil {
+			return
+		}
+
 		// Parse headers
 		headerMap := parseHeadersFromBytes(remainingHeaders)
 
@@ -218,12 +225,6 @@ func (r *Router) RunConnection(conn net.Conn) {
 
 				bodyData = append(bodyData, remainingBuffer[:totalRead]...)
 			}
-		}
-
-		// Parse request line
-		method, pathBytes, err := parseRequestLineFromBytes(firstLine)
-		if err != nil {
-			return
 		}
 
 		// Parse query string
@@ -250,19 +251,6 @@ func (r *Router) RunConnection(conn net.Conn) {
 		// Detect browser
 		browserName := detectBrowser(headerMap["User-Agent"])
 
-		// Security: Check for path traversal
-		cleanedPath := filepath.Clean(cleanPath)
-		if bytes.Contains([]byte(cleanedPath), []byte("..")) {
-			responseBytes, status := CreateResponseBytes("403", "text/plain", "Forbidden", []byte("Access denied"))
-			logRequest(method, cleanPath, status)
-			conn.Write(responseBytes)
-
-			if headerMap["Connection"] == "close" {
-				break
-			}
-			continue
-		}
-
 		var responseBytes []byte
 		var status string
 
@@ -274,8 +262,15 @@ func (r *Router) RunConnection(conn net.Conn) {
 			filePath = "pages" + cleanPath
 		}
 
-		// Try serving static file first
-		if fileExists(filePath) {
+		// Security: Check for path traversal (only for static files)
+		baseDir := "pages"
+		absBaseDir, _ := filepath.Abs(baseDir)
+		absFilePath, _ := filepath.Abs(filePath)
+
+		isPathTraversal := !strings.HasPrefix(absFilePath, absBaseDir)
+
+		// Try serving static file first (with path traversal protection)
+		if !isPathTraversal && fileExists(filePath) {
 			content, success := readFileContent(filePath)
 			if success {
 				contentType := getContentType(filePath)
@@ -283,6 +278,14 @@ func (r *Router) RunConnection(conn net.Conn) {
 			} else {
 				responseBytes, status = serve404Bytes()
 			}
+		} else if isPathTraversal {
+			// Path traversal attempt - return 403
+			responseBytes, status = CreateResponseBytes(
+				"403",
+				"text/plain",
+				"Forbidden",
+				[]byte("Access denied"),
+			)
 		} else {
 			// Try routing
 			responseBytes, status = r.HandleBytes(method, cleanPath, queryMap, bodyMap, browserName)
@@ -478,4 +481,49 @@ func (r *Router) Register(method, path string, handler RouteHandler) {
 		r.routes[method] = make(map[string]RouteHandler)
 	}
 	r.routes[method][path] = handler
+}
+
+// CreateResponse creates an HTTP response as a string (for compatibility)
+func CreateResponse(statusCode, contentType, statusMessage, body string) (string, string) {
+	responseBytes, status := CreateResponseBytes(statusCode, contentType, statusMessage, []byte(body))
+	return string(responseBytes), status
+}
+
+// Handle routing and return string response (for compatibility)
+func (r *Router) Handle(method, cleanPath string, queryMap, bodyMap map[string]string, browserName string) (string, string) {
+	responseBytes, status := r.HandleBytes(method, cleanPath, queryMap, bodyMap, browserName)
+	return string(responseBytes), status
+}
+
+// parseRequestLine parses the HTTP request line (for compatibility with tests)
+func parseRequestLine(line string) (method string, path string, err error) {
+	parts := strings.Split(line, " ")
+	if len(parts) < 3 {
+		return "", "", errors.New("invalid request line")
+	}
+	return parts[0], parts[1], nil
+}
+
+// parseHeaders parses HTTP headers from string slice (for compatibility with tests)
+func parseHeaders(headerLines []string) map[string]string {
+	headerMap := make(map[string]string)
+	for _, line := range headerLines {
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			headerMap[key] = value
+		}
+	}
+	return headerMap
+}
+
+// parseKeyValuePairs parses URL-encoded key-value pairs (for compatibility with tests)
+func parseKeyValuePairs(data string) map[string]string {
+	return parseKeyValuePairsFromBytes([]byte(data))
+}
+
+// parseJSONBody parses JSON body from string (for compatibility with tests)
+func parseJSONBody(body string) map[string]string {
+	return parseJSONBodyFromBytes([]byte(body))
 }

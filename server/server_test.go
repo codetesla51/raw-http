@@ -12,9 +12,8 @@ func TestRouter(t *testing.T) {
 	router := NewRouter()
 
 	// Test route registration and handling
-	router.Register("GET", "/test", func(req *Request) (string, string) {
-		resp, stat := CreateResponse("200", "text/plain", "OK", "test response")
-		return resp, stat
+	router.Register("GET", "/test", func(req *Request) ([]byte, string) {
+		return CreateResponseBytes("200", "text/plain", "OK", []byte("test response"))
 	})
 
 	response, status := router.Handle("GET", "/test", nil, nil, "Chrome")
@@ -229,9 +228,8 @@ func TestIntegration(t *testing.T) {
 	router := NewRouter()
 
 	// Register a test route
-	router.Register("GET", "/ping", func(req *Request) (string, string) {
-		resp, stat := CreateResponse("200", "text/plain", "OK", "pong")
-		return resp, stat
+	router.Register("GET", "/ping", func(req *Request) ([]byte, string) {
+		return CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
 	})
 
 	// Start server in goroutine
