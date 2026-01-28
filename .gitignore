@@ -1,0 +1,34 @@
+# Binaries
+raw-http
+raw-http.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Directories
+bin/
+dist/
+
+# Test binaries
+*.test
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local files
+*.local
+*.tmp
+certs/
+certificates/
+
+# ARCHITECTURE.md is for local learning only
+ARCHITECTURE.md
