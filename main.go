@@ -59,6 +59,7 @@ func main() {
 
 	// Create router and register routes
 	router := server.NewRouter()
+
 	router.Register("GET", "/welcome", homeHandler)
 	router.Register("GET", "/hello", handleHello)
 	router.Register("GET", "/login", loginHandler)

@@ -30,6 +30,14 @@ func NewRouter() *Router {
 	}
 
 }
+// router instance with config
+func NewRouterWithConfig(config *Config) *Router {
+	return &Router{
+		routes: make(map[string]map[string]RouteHandler),
+		config: config,
+	}
+
+}
 
 // Register adds a route handler for a method and path
 func (r *Router) Register(method, path string, handler RouteHandler) {
