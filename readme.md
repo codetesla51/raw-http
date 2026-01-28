@@ -2,7 +2,9 @@
 
 A lightweight HTTP/HTTPS server built from raw TCP sockets in Go to understand HTTP protocol internals and network programming fundamentals. No frameworks - just socket programming, HTTP parsing, and TLS encryption.
 
-**Peak performance: 10,000+ RPS** | **Built for learning and understanding fundamentals**
+STATUS: In Development
+
+PERFORMANCE: 8,900 - 11,600 RPS depending on load and request type
 
 ## Quick Start
 
@@ -39,7 +41,84 @@ curl -X POST http://localhost:8080/login \
 - **HTTPS/TLS support** - Optional encrypted connections with certificate support
 - **Graceful shutdown** - Clean server termination with signal handling
 - **Bytes-optimized processing** - Zero-copy parsing with strategic buffer pooling
-- **High-performance networking** - Sub-millisecond response times under optimal load
+- **High-performance networking** - Optimized for low-latency request handling
+- **Configurable performance** - Timeouts, logging toggle, keep-alive control
+
+## Benchmark Results (January 2026)
+
+All benchmarks run with keep-alive enabled on 8-core system.
+
+### Sweet Spot Performance
+```
+100 concurrent connections, 10k requests (GET /ping)
+RPS: 9,818 requests/second
+Response time: 10.2ms mean
+Failures: 0
+```
+
+### Sustained Load
+```
+200 concurrent connections, 50k requests (GET /ping)
+RPS: 9,713 requests/second
+Response time: 20.6ms mean
+Failures: 0
+Status: Stable
+```
+
+### High Concurrency
+```
+500 concurrent connections, 100k requests (GET /ping)
+RPS: 11,635 requests/second (peak)
+Response time: 43ms mean
+Failures: 0
+```
+
+### Extreme Load
+```
+1000 concurrent connections, 100k requests (GET /ping)
+RPS: 11,303 requests/second
+Response time: 88.5ms mean
+Failures: 0
+Status: Still stable, minimal degradation
+```
+
+### Stress Test
+```
+5000 concurrent connections, 100k requests (GET /ping)
+RPS: 8,930 requests/second
+Response time: 559ms mean
+Failures: 0
+Status: Degraded but recovers - handling at OS limits
+Breaking point: Yes, approaching file descriptor limits on test machine
+```
+
+### POST Requests
+```
+100 concurrent connections, 10k POST requests (with body)
+RPS: 6,617 requests/second
+Response time: 15.1ms mean
+Failures: 0
+Note: ~35% slower than GET due to body parsing
+```
+
+### Static File Serving
+```
+100 concurrent connections, 10k requests (index.html)
+RPS: 6,349 requests/second
+Response time: 15.8ms mean
+Failures: 0
+Note: Similar to POST - disk I/O overhead
+```
+
+## Performance Characteristics
+
+Maximum RPS: 11,635 (at 500 concurrent connections)
+Optimal RPS: 9,818 (at 100 concurrent connections - lowest latency)
+Breaking point: 5,000+ concurrent connections (OS file descriptor limits)
+Zero failures up to 5,000 concurrent connections
+
+Fastest endpoints: Simple in-memory handlers (/ping)
+Slowest endpoints: File I/O (static files), body parsing (POST requests)
 
 ## Panic Recovery
 
