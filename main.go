@@ -40,7 +40,7 @@ func main() {
 	// Setup HTTPS listener if certs exist
 	hasTLS := false
 	var tlsListener net.Listener
-	if fileExists("server.crt") && fileExists("server.key") {
+	if server.FileExists("server.crt") && server.FileExists("server.key") {
 		cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
 		if err != nil {
 			log.Println("Failed to load TLS certificate:", err)
@@ -184,9 +184,4 @@ func handleHello(req *server.Request) ([]byte, string) {
 		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Template error"))
 	}
 	return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
-}
-
-func fileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	return err == nil
 }
