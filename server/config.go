@@ -9,6 +9,7 @@ type Config struct {
 	MaxHeaderSize   int
 	MaxBodySize     int64
 	EnableKeepAlive bool
+	EnableLogging   bool
 }
 
 func DefaultConfig() *Config {
@@ -19,5 +20,6 @@ func DefaultConfig() *Config {
 		MaxHeaderSize:   8192,
 		MaxBodySize:     10 * 1024 * 1024, // 10MB
 		EnableKeepAlive: true,
+		EnableLogging:   false,
 	}
 }

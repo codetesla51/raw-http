@@ -171,8 +171,9 @@ func (r *Router) processRequest(conn net.Conn, requestData []byte) ([]byte, stri
 	// Route request
 	responseBytes, status := r.routeRequest(method, cleanPath, queryMap, bodyMap, browserName)
 
-	// Log request
-	logRequest(method, cleanPath, status)
+	if r.config.EnableLogging {
+		logRequest(method, cleanPath, status)
+	}
 
 	// Check if connection should close
 	shouldClose := headerMap["Connection"] == "close"
@@ -196,7 +197,7 @@ func (r *Router) readRemainingBody(conn net.Conn, headerMap map[string]string, b
 	remainingBuffer := make([]byte, remainingBytes)
 	totalRead := 0
 
-	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(r.config.ReadTimeout))
 
 	for totalRead < remainingBytes {
 		n, err := conn.Read(remainingBuffer[totalRead:])
