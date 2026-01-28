@@ -19,13 +19,16 @@ type RouteHandler func(req *Request) (response []byte, status string)
 type Router struct {
 	mu     sync.RWMutex
 	routes map[string]map[string]RouteHandler
+	config *Config
 }
 
 // NewRouter creates a new Router instance
 func NewRouter() *Router {
 	return &Router{
 		routes: make(map[string]map[string]RouteHandler),
+		config: DefaultConfig(),
 	}
+
 }
 
 // Register adds a route handler for a method and path
@@ -86,7 +89,7 @@ func (r *Router) RunConnection(conn net.Conn) {
 
 	for {
 		// Read request
-		requestData, err := readHTTPRequest(conn)
+		requestData, err := readHTTPRequest(conn, r.config)
 		if err != nil {
 			return
 		}

@@ -22,7 +22,7 @@ type Request struct {
 }
 
 // readHTTPRequest reads HTTP request headers from a connection
-func readHTTPRequest(conn net.Conn) ([]byte, error) {
+func readHTTPRequest(conn net.Conn, config *Config) ([]byte, error) {
 	bufPtr := requestBufferPool.Get().(*[]byte)
 	headerBuffer := (*bufPtr)[:0]
 
@@ -32,13 +32,12 @@ func readHTTPRequest(conn net.Conn) ([]byte, error) {
 		}
 	}()
 
-	maxHeaderSize := 8192
 	endMarker := []byte("\r\n\r\n")
 
 	for {
-		conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(config.ReadTimeout))
 
-		if len(headerBuffer) > maxHeaderSize {
+		if len(headerBuffer) > config.MaxHeaderSize {
 			return nil, errors.New("headers too large")
 		}
 
