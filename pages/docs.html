@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation | raw-http</title>
+    <meta name="description" content="Documentation for raw-http - a lightweight HTTP/1.1 server for Go.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#10b981',
+                        dark: {
+                            900: '#0a0a0a',
+                            800: '#111111',
+                            700: '#1a1a1a',
+                            600: '#262626',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Kanit:wght@400;500;600;700&display=swap');
+        body { font-family: 'Kanit', sans-serif; }
+        code, pre { font-family: 'JetBrains Mono', monospace; }
+        .gradient-text {
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        pre::-webkit-scrollbar { height: 8px; width: 8px; }
+        pre::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 4px; }
+        pre::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }
+        .prose h2 { scroll-margin-top: 100px; }
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-100 antialiased">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark-900/80 backdrop-blur-md border-b border-dark-600 z-50">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="flex items-center">
+                <span class="text-2xl font-bold"><span class="text-primary">raw</span>-http</span>
+            </a>
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-gray-400 hover:text-white transition">Home</a>
+                <a href="/docs.html" class="text-white transition">Docs</a>
+                <a href="https://github.com/codetesla51/raw-http" target="_blank" class="flex items-center gap-2 bg-dark-700 hover:bg-dark-600 px-4 py-2 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="pt-24 pb-20 px-6">
+        <div class="max-w-4xl mx-auto">
+            <!-- Header -->
+            <div class="mb-12">
+                <h1 class="text-4xl font-bold mb-4">Documentation</h1>
+                <p class="text-gray-400 text-lg">Everything you need to get started with raw-http.</p>
+            </div>
+
+            <!-- Table of Contents -->
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-6 mb-12">
+                <h2 class="font-semibold mb-4 text-gray-300">On this page</h2>
+                <nav class="space-y-2">
+                    <a href="#installation" class="block text-gray-400 hover:text-primary transition">Installation</a>
+                    <a href="#quick-start" class="block text-gray-400 hover:text-primary transition">Quick Start</a>
+                    <a href="#routing" class="block text-gray-400 hover:text-primary transition">Routing</a>
+                    <a href="#request-object" class="block text-gray-400 hover:text-primary transition">Request Object</a>
+                    <a href="#responses" class="block text-gray-400 hover:text-primary transition">Responses</a>
+                    <a href="#static-files" class="block text-gray-400 hover:text-primary transition">Static Files</a>
+                    <a href="#configuration" class="block text-gray-400 hover:text-primary transition">Configuration</a>
+                </nav>
+            </div>
+
+            <!-- Installation -->
+            <section id="installation" class="mb-16">
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                    Installation
+                </h2>
+                <p class="text-gray-400 mb-4">Add raw-http to your Go project:</p>
+                <div class="relative" x-data="{ copied: false }">
+                    <pre class="bg-dark-800 border border-dark-600 rounded-xl p-4 overflow-x-auto"><code class="text-gray-300" id="code-install">go get github.com/codetesla51/raw-http@v1.0.0</code></pre>
+                    <button 
+                        @click="navigator.clipboard.writeText($refs.installCode.textContent); copied = true; setTimeout(() => copied = false, 2000)"
+                        class="absolute top-3 right-3 text-gray-500 hover:text-primary transition p-2 bg-dark-700 rounded-lg flex items-center gap-1"
+                    >
+                        <template x-if="!copied">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        </template>
+                        <template x-if="copied">
+                            <span class="text-primary text-xs font-medium">Copied!</span>
+                        </template>
+                    </button>
+                    <span x-ref="installCode" class="hidden">go get github.com/codetesla51/raw-http@v1.0.0</span>
+                </div>
+            </section>
+
+            <!-- Quick Start -->
+            <section id="quick-start" class="mb-16">
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Quick Start
+                </h2>
+                <p class="text-gray-400 mb-4">A minimal server with one route:</p>
+                <div class="relative" x-data="{ copied: false }">
+                    <pre class="bg-dark-800 border border-dark-600 rounded-xl p-4 overflow-x-auto text-sm"><code class="text-gray-300"><span class="text-gray-500">package</span> main
+
+<span class="text-gray-500">import</span> (
+    <span class="text-primary">"fmt"</span>
+    <span class="text-primary">"net"</span>
+    <span class="text-primary">"github.com/codetesla51/raw-http/server"</span>
+)
+
+<span class="text-gray-500">func</span> <span class="text-white">main</span>() {
+    router := server.<span class="text-primary">NewRouter</span>()
+    config := server.<span class="text-primary">DefaultConfig</span>()
+
+    <span class="text-gray-600">// Register a route</span>
+    router.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/ping"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
+        <span class="text-gray-500">return</span> server.<span class="text-primary">CreateResponseBytes</span>(<span class="text-primary">"200"</span>, <span class="text-primary">"text/plain"</span>, <span class="text-primary">"OK"</span>, []<span class="text-gray-500">byte</span>(<span class="text-primary">"pong"</span>))
+    })
+
+    <span class="text-gray-600">// Start listening</span>
+    listener, _ := net.<span class="text-primary">Listen</span>(<span class="text-primary">"tcp"</span>, <span class="text-primary">":8080"</span>)
+    fmt.<span class="text-primary">Println</span>(<span class="text-primary">"Server running on http://localhost:8080"</span>)
+
+    <span class="text-gray-500">for</span> {
+        conn, _ := listener.<span class="text-primary">Accept</span>()
+        <span class="text-gray-500">go</span> server.<span class="text-primary">HandleConnection</span>(conn, router, config)
+    }
+}</code></pre>
+                    <button 
+                        @click="navigator.clipboard.writeText($refs.quickstartCode.textContent); copied = true; setTimeout(() => copied = false, 2000)"
+                        class="absolute top-3 right-3 text-gray-500 hover:text-primary transition p-2 bg-dark-700 rounded-lg flex items-center gap-1"
+                    >
+                        <template x-if="!copied">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        </template>
+                        <template x-if="copied">
+                            <span class="text-primary text-xs font-medium">Copied!</span>
+                        </template>
+                    </button>
+                    <span x-ref="quickstartCode" class="hidden">package main
+
+import (
+    "fmt"
+    "net"
+    "github.com/codetesla51/raw-http/server"
+)
+
+func main() {
+    router := server.NewRouter()
+    config := server.DefaultConfig()
+
+    // Register a route
+    router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
+        return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
+    })
+
+    // Start listening
+    listener, _ := net.Listen("tcp", ":8080")
+    fmt.Println("Server running on http://localhost:8080")
+
+    for {
+        conn, _ := listener.Accept()
+        go server.HandleConnection(conn, router, config)
+    }
+}</span>
+                </div>
+            </section>
+
+            <!-- Routing -->
+            <section id="routing" class="mb-16">
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+                    Routing
+                </h2>
+                <p class="text-gray-400 mb-4">Register routes with HTTP methods and path parameters:</p>
+                <div class="relative" x-data="{ copied: false }">
+                    <pre class="bg-dark-800 border border-dark-600 rounded-xl p-4 overflow-x-auto text-sm"><code class="text-gray-300"><span class="text-gray-600">// Exact route</span>
+router.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/api/health"</span>, handler)
+
+<span class="text-gray-600">// Path parameter</span>
+router.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/users/:id"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
+    userID := req.PathParams[<span class="text-primary">"id"</span>]  <span class="text-gray-600">// Access the :id parameter</span>
+    <span class="text-gray-500">return</span> server.<span class="text-primary">CreateResponseBytes</span>(<span class="text-primary">"200"</span>, <span class="text-primary">"text/plain"</span>, <span class="text-primary">"OK"</span>, []<span class="text-gray-500">byte</span>(userID))
+})
+
+<span class="text-gray-600">// Multiple parameters</span>
+router.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/posts/:postId/comments/:commentId"</span>, handler)
+
+<span class="text-gray-600">// POST with body</span>
+router.<span class="text-primary">Register</span>(<span class="text-primary">"POST"</span>, <span class="text-primary">"/api/data"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
+    body := req.Body
+    <span class="text-gray-500">return</span> server.<span class="text-primary">CreateResponseBytes</span>(<span class="text-primary">"201"</span>, <span class="text-primary">"application/json"</span>, <span class="text-primary">"Created"</span>, body)
+})</code></pre>
+                    <button 
+                        @click="navigator.clipboard.writeText($refs.routingCode.textContent); copied = true; setTimeout(() => copied = false, 2000)"
+                        class="absolute top-3 right-3 text-gray-500 hover:text-primary transition p-2 bg-dark-700 rounded-lg flex items-center gap-1"
+                    >
+                        <template x-if="!copied">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        </template>
+                        <template x-if="copied">
+                            <span class="text-primary text-xs font-medium">Copied!</span>
+                        </template>
+                    </button>
+                    <span x-ref="routingCode" class="hidden">// Exact route
+router.Register("GET", "/api/health", handler)
+
+// Path parameter
+router.Register("GET", "/users/:id", func(req *server.Request) ([]byte, string) {
+    userID := req.PathParams["id"]  // Access the :id parameter
+    return server.CreateResponseBytes("200", "text/plain", "OK", []byte(userID))
+})
+
+// Multiple parameters
+router.Register("GET", "/posts/:postId/comments/:commentId", handler)
+
+// POST with body
+router.Register("POST", "/api/data", func(req *server.Request) ([]byte, string) {
+    body := req.Body
+    return server.CreateResponseBytes("201", "application/json", "Created", body)
+})</span>
+                </div>
+            </section>
+
+            <!-- Request Object -->
+            <section id="request-object" class="mb-16">
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                    Request Object
+                </h2>
+                <p class="text-gray-400 mb-4">Access all request data through the <code class="text-primary bg-dark-800 px-2 py-1 rounded">*server.Request</code> struct:</p>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-dark-700">
+                            <tr>
+                                <th class="text-left px-4 py-3 text-gray-400 font-medium">Field</th>
+                                <th class="text-left px-4 py-3 text-gray-400 font-medium">Type</th>
+                                <th class="text-left px-4 py-3 text-gray-400 font-medium">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-dark-600">
+                            <tr><td class="px-4 py-2 font-mono text-primary">Method</td><td class="px-4 py-2 text-gray-400">string</td><td class="px-4 py-2 text-gray-400">GET, POST, PUT, DELETE, etc.</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Path</td><td class="px-4 py-2 text-gray-400">string</td><td class="px-4 py-2 text-gray-400">Request path (e.g., "/users/123")</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">PathParams</td><td class="px-4 py-2 text-gray-400">map[string]string</td><td class="px-4 py-2 text-gray-400">Dynamic route parameters</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">QueryParams</td><td class="px-4 py-2 text-gray-400">map[string]string</td><td class="px-4 py-2 text-gray-400">URL query string values</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Headers</td><td class="px-4 py-2 text-gray-400">map[string]string</td><td class="px-4 py-2 text-gray-400">HTTP request headers</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Body</td><td class="px-4 py-2 text-gray-400">[]byte</td><td class="px-4 py-2 text-gray-400">Raw request body</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">ContentLength</td><td class="px-4 py-2 text-gray-400">int</td><td class="px-4 py-2 text-gray-400">Body size in bytes</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Responses -->
+            <section id="responses" class="mb-16">
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+                    Responses
+                </h2>
+                <p class="text-gray-400 mb-4">Create responses with <code class="text-primary bg-dark-800 px-2 py-1 rounded">CreateResponseBytes</code> or use helper functions:</p>
+                <div class="relative mb-4" x-data="{ copied: false }">
+                    <pre class="bg-dark-800 border border-dark-600 rounded-xl p-4 overflow-x-auto text-sm"><code class="text-gray-300"><span class="text-gray-600">// Manual response</span>
+server.<span class="text-primary">CreateResponseBytes</span>(statusCode, contentType, statusText, body)
+
+<span class="text-gray-600">// Example</span>
+<span class="text-gray-500">return</span> server.<span class="text-primary">CreateResponseBytes</span>(<span class="text-primary">"200"</span>, <span class="text-primary">"application/json"</span>, <span class="text-primary">"OK"</span>, jsonData)</code></pre>
+                </div>
+                <p class="text-gray-400 mb-4">Built-in helper functions:</p>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-dark-700">
+                            <tr>
+                                <th class="text-left px-4 py-3 text-gray-400 font-medium">Function</th>
+                                <th class="text-left px-4 py-3 text-gray-400 font-medium">Status</th>
+                                <th class="text-left px-4 py-3 text-gray-400 font-medium">Use Case</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-dark-600">
+                            <tr><td class="px-4 py-2 font-mono text-primary">Serve201()</td><td class="px-4 py-2 text-gray-400">201</td><td class="px-4 py-2 text-gray-400">Created</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Serve204()</td><td class="px-4 py-2 text-gray-400">204</td><td class="px-4 py-2 text-gray-400">No Content</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Serve400()</td><td class="px-4 py-2 text-gray-400">400</td><td class="px-4 py-2 text-gray-400">Bad Request</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Serve401()</td><td class="px-4 py-2 text-gray-400">401</td><td class="px-4 py-2 text-gray-400">Unauthorized</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Serve403()</td><td class="px-4 py-2 text-gray-400">403</td><td class="px-4 py-2 text-gray-400">Forbidden</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Serve404()</td><td class="px-4 py-2 text-gray-400">404</td><td class="px-4 py-2 text-gray-400">Not Found</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Serve405()</td><td class="px-4 py-2 text-gray-400">405</td><td class="px-4 py-2 text-gray-400">Method Not Allowed</td></tr>
+                            <tr><td class="px-4 py-2 font-mono text-primary">Serve500()</td><td class="px-4 py-2 text-gray-400">500</td><td class="px-4 py-2 text-gray-400">Internal Server Error</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Static Files -->
+            <section id="static-files" class="mb-16">
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                    Static Files
+                </h2>
+                <p class="text-gray-400 mb-4">Put files in the <code class="text-primary bg-dark-800 px-2 py-1 rounded">pages/</code> directory:</p>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-4 mb-4">
+                    <pre class="text-gray-300 text-sm"><code>pages/
+├── index.html      <span class="text-gray-500">→ /</span>
+├── about.html      <span class="text-gray-500">→ /about.html</span>
+├── styles.css      <span class="text-gray-500">→ /styles.css</span>
+└── 404.html        <span class="text-gray-500">→ Custom 404 page</span></code></pre>
+                </div>
+                <p class="text-gray-400">MIME types are auto-detected. Supported: HTML, CSS, JS, JSON, images, fonts, and more.</p>
+            </section>
+
+            <!-- Configuration -->
+            <section id="configuration" class="mb-16">
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                    Configuration
+                </h2>
+                <p class="text-gray-400 mb-4">Customize server behavior with Config:</p>
+                <div class="relative" x-data="{ copied: false }">
+                    <pre class="bg-dark-800 border border-dark-600 rounded-xl p-4 overflow-x-auto text-sm"><code class="text-gray-300">config := &server.<span class="text-primary">Config</span>{
+    ReadTimeout:      <span class="text-primary">30</span> * time.Second,   <span class="text-gray-600">// Max time to read request</span>
+    WriteTimeout:     <span class="text-primary">30</span> * time.Second,   <span class="text-gray-600">// Max time to write response</span>
+    IdleTimeout:      <span class="text-primary">120</span> * time.Second,  <span class="text-gray-600">// Keep-alive timeout</span>
+    MaxHeaderSize:    <span class="text-primary">1</span> << <span class="text-primary">20</span>,            <span class="text-gray-600">// 1MB max header size</span>
+    MaxBodySize:      <span class="text-primary">10</span> << <span class="text-primary">20</span>,           <span class="text-gray-600">// 10MB max body size</span>
+    EnableKeepAlive:  <span class="text-primary">true</span>,
+    MaxKeepAliveReqs: <span class="text-primary">100</span>,               <span class="text-gray-600">// Requests per connection</span>
+}
+
+<span class="text-gray-600">// Or use defaults</span>
+config := server.<span class="text-primary">DefaultConfig</span>()</code></pre>
+                    <button 
+                        @click="navigator.clipboard.writeText($refs.configCode.textContent); copied = true; setTimeout(() => copied = false, 2000)"
+                        class="absolute top-3 right-3 text-gray-500 hover:text-primary transition p-2 bg-dark-700 rounded-lg flex items-center gap-1"
+                    >
+                        <template x-if="!copied">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        </template>
+                        <template x-if="copied">
+                            <span class="text-primary text-xs font-medium">Copied!</span>
+                        </template>
+                    </button>
+                    <span x-ref="configCode" class="hidden">config := &server.Config{
+    ReadTimeout:      30 * time.Second,   // Max time to read request
+    WriteTimeout:     30 * time.Second,   // Max time to write response
+    IdleTimeout:      120 * time.Second,  // Keep-alive timeout
+    MaxHeaderSize:    1 << 20,            // 1MB max header size
+    MaxBodySize:      10 << 20,           // 10MB max body size
+    EnableKeepAlive:  true,
+    MaxKeepAliveReqs: 100,               // Requests per connection
+}
+
+// Or use defaults
+config := server.DefaultConfig()</span>
+                </div>
+            </section>
+
+            <!-- Footer CTA -->
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-8 text-center">
+                <h3 class="text-xl font-bold mb-2">Need more?</h3>
+                <p class="text-gray-400 mb-6">Check out the full README on GitHub for advanced usage.</p>
+                <a href="https://github.com/codetesla51/raw-http#readme" target="_blank" class="inline-flex items-center gap-2 bg-primary hover:bg-emerald-600 text-black font-semibold px-6 py-3 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    View on GitHub
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-dark-600 py-8 px-6">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-2 text-gray-400">
+                <span class="font-semibold"><span class="text-primary">raw</span>-http</span>
+                <span class="text-gray-600">•</span>
+                <span>MIT License</span>
+            </div>
+            <div class="text-gray-500 text-sm">
+                This page is served by raw-http
+            </div>
+            <a href="https://github.com/codetesla51" target="_blank" class="text-gray-400 hover:text-white transition">
+                @codetesla51
+            </a>
+        </div>
+    </footer>
+</body>
+</html>

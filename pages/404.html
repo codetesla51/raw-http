@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found | raw-http</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#10b981',
+                        dark: {
+                            900: '#0a0a0a',
+                            800: '#111111',
+                            700: '#1a1a1a',
+                            600: '#262626',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Kanit:wght@400;500;600;700&display=swap');
+        body { font-family: 'Kanit', sans-serif; }
+        code { font-family: 'JetBrains Mono', monospace; }
+        .gradient-text {
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .glitch {
+            animation: glitch 2s infinite;
+        }
+        @keyframes glitch {
+            0%, 90%, 100% { transform: translate(0); }
+            92% { transform: translate(-2px, 2px); }
+            94% { transform: translate(2px, -2px); }
+            96% { transform: translate(-2px, -2px); }
+            98% { transform: translate(2px, 2px); }
+        }
+        .float {
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .pulse-glow {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+            50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.4); }
+        }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-100 antialiased min-h-screen flex flex-col">
+    <!-- Navigation -->
+    <nav class="w-full bg-dark-900/80 backdrop-blur-md border-b border-dark-600">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="flex items-center">
+                <span class="text-2xl font-bold"><span class="text-primary">raw</span>-http</span>
+            </a>
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-gray-400 hover:text-white transition">Home</a>
+                <a href="/docs.html" class="text-gray-400 hover:text-white transition">Docs</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex items-center justify-center px-6 py-20">
+        <div class="text-center max-w-2xl">
+            <!-- 404 Graphic -->
+            <div class="mb-8 float">
+                <div class="relative inline-block">
+                    <!-- Background glow -->
+                    <div class="absolute inset-0 bg-primary/20 blur-3xl rounded-full"></div>
+                    
+                    <!-- Terminal window -->
+                    <div class="relative bg-dark-800 border border-dark-600 rounded-xl p-6 pulse-glow">
+                        <div class="flex items-center gap-2 mb-4">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                            <span class="ml-2 text-gray-500 text-sm">terminal</span>
+                        </div>
+                        <div class="text-left">
+                            <code class="text-gray-400">$ curl localhost:8080/...</code>
+                            <br>
+                            <code class="text-red-400">HTTP/1.1 <span class="glitch">404</span> Not Found</code>
+                            <br>
+                            <code class="text-gray-500">Content-Type: text/html</code>
+                            <br><br>
+                            <code class="text-primary">{"error": "page_not_found"}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Text -->
+            <h1 class="text-6xl md:text-8xl font-bold mb-4 glitch">
+                <span class="gradient-text">404</span>
+            </h1>
+            <h2 class="text-2xl md:text-3xl font-semibold mb-4 text-gray-200">
+                Page Not Found
+            </h2>
+            <p class="text-gray-400 text-lg mb-8 max-w-md mx-auto">
+                The route you're looking for doesn't exist. Maybe it was never registered, 
+                or perhaps it got lost in the TCP void.
+            </p>
+
+            <!-- Actions -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                <a href="/" class="bg-primary hover:bg-emerald-600 text-black font-semibold px-8 py-3 rounded-lg transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Go Home
+                </a>
+                <a href="/docs.html" class="bg-dark-700 hover:bg-dark-600 border border-dark-600 px-8 py-3 rounded-lg transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    Read the Docs
+                </a>
+            </div>
+
+            <!-- Suggestion -->
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-6 text-left max-w-md mx-auto">
+                <h3 class="font-semibold mb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    Maybe you wanted:
+                </h3>
+                <ul class="space-y-2 text-sm">
+                    <li>
+                        <a href="/" class="text-gray-400 hover:text-primary transition flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+                            / — Home page
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/docs.html" class="text-gray-400 hover:text-primary transition flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+                            /docs.html — Documentation
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/codetesla51/raw-http" target="_blank" class="text-gray-400 hover:text-primary transition flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+                            GitHub — Source code
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-dark-600 py-6 px-6">
+        <div class="max-w-6xl mx-auto flex justify-between items-center text-sm">
+            <div class="flex items-center gap-2 text-gray-500">
+                <span class="font-semibold"><span class="text-primary">raw</span>-http</span>
+            </div>
+            <div class="text-gray-600">
+                HTTP/1.1 404 Not Found
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

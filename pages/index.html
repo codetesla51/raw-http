@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>raw-http | Lightweight HTTP Server for Go</title>
+    <meta name="description" content="A lightweight HTTP/1.1 server built from raw TCP sockets in Go. No frameworks, no overhead.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#10b981',
+                        dark: {
+                            900: '#0a0a0a',
+                            800: '#111111',
+                            700: '#1a1a1a',
+                            600: '#262626',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Kanit:wght@400;500;600;700&display=swap');
+        body { font-family: 'Kanit', sans-serif; }
+        code, pre { font-family: 'JetBrains Mono', monospace; }
+        .gradient-text {
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .glow {
+            box-shadow: 0 0 60px rgba(16, 185, 129, 0.15);
+        }
+        pre::-webkit-scrollbar { height: 8px; }
+        pre::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 4px; }
+        pre::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-100 antialiased">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark-900/80 backdrop-blur-md border-b border-dark-600 z-50">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="flex items-center">
+                <span class="text-2xl font-bold"><span class="text-primary">raw</span>-http</span>
+            </a>
+            <div class="flex items-center gap-6">
+                <a href="#features" class="text-gray-400 hover:text-white transition">Features</a>
+                <a href="#benchmarks" class="text-gray-400 hover:text-white transition">Benchmarks</a>
+                <a href="/docs.html" class="text-gray-400 hover:text-white transition">Docs</a>
+                <a href="https://github.com/codetesla51/raw-http" target="_blank" class="flex items-center gap-2 bg-dark-700 hover:bg-dark-600 px-4 py-2 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="pt-32 pb-20 px-6">
+        <div class="max-w-6xl mx-auto text-center">
+            <div class="inline-flex items-center gap-2 bg-dark-700 border border-dark-600 rounded-full px-4 py-1.5 mb-8">
+                <span class="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <span class="text-sm text-gray-400">v1.0.0 Released</span>
+            </div>
+            <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                HTTP Server,<br><span class="gradient-text">Raw & Fast</span>
+            </h1>
+            <p class="text-xl text-gray-400 max-w-2xl mx-auto mb-10">
+                A lightweight HTTP/1.1 server built from raw TCP sockets in Go. 
+                No frameworks, no overhead. Just pure performance.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                <a href="#quickstart" class="bg-primary hover:bg-emerald-600 text-black font-semibold px-8 py-3 rounded-lg transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Get Started
+                </a>
+                <a href="https://github.com/codetesla51/raw-http" target="_blank" class="bg-dark-700 hover:bg-dark-600 border border-dark-600 px-8 py-3 rounded-lg transition flex items-center justify-center gap-2">
+                    View on GitHub
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                </a>
+            </div>
+            <!-- Install command -->
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-4 max-w-xl mx-auto glow" x-data="{ copied: false }">
+                <div class="flex items-center justify-between">
+                    <code class="text-gray-300">go get github.com/codetesla51/raw-http@v1.0.0</code>
+                    <button 
+                        @click="navigator.clipboard.writeText('go get github.com/codetesla51/raw-http@v1.0.0'); copied = true; setTimeout(() => copied = false, 2000)"
+                        class="text-gray-500 hover:text-primary transition p-2 flex items-center gap-1"
+                    >
+                        <template x-if="!copied">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        </template>
+                        <template x-if="copied">
+                            <span class="text-primary text-sm font-medium">Copied!</span>
+                        </template>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="py-20 px-6 bg-dark-800">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-4">Built for Simplicity</h2>
+            <p class="text-gray-400 text-center mb-12 max-w-2xl mx-auto">Everything you need, nothing you don't.</p>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-dark-700 border border-dark-600 rounded-xl p-6 hover:border-primary/50 transition">
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">Fast</h3>
+                    <p class="text-gray-400 text-sm">11,000+ requests/sec with keep-alive. Zero-copy parsing, buffer pooling.</p>
+                </div>
+                <div class="bg-dark-700 border border-dark-600 rounded-xl p-6 hover:border-primary/50 transition">
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">Zero Dependencies</h3>
+                    <p class="text-gray-400 text-sm">Built from raw TCP sockets. No external HTTP libraries required.</p>
+                </div>
+                <div class="bg-dark-700 border border-dark-600 rounded-xl p-6 hover:border-primary/50 transition">
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">Secure</h3>
+                    <p class="text-gray-400 text-sm">TLS/HTTPS support, path traversal protection, panic recovery.</p>
+                </div>
+                <div class="bg-dark-700 border border-dark-600 rounded-xl p-6 hover:border-primary/50 transition">
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">Simple API</h3>
+                    <p class="text-gray-400 text-sm">Register routes, handle requests. That's it. No magic.</p>
+                </div>
+                <div class="bg-dark-700 border border-dark-600 rounded-xl p-6 hover:border-primary/50 transition">
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">Path Parameters</h3>
+                    <p class="text-gray-400 text-sm">Route patterns like <code class="text-primary">/users/:id</code> with automatic extraction.</p>
+                </div>
+                <div class="bg-dark-700 border border-dark-600 rounded-xl p-6 hover:border-primary/50 transition">
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">Static Files</h3>
+                    <p class="text-gray-400 text-sm">Serve HTML, CSS, JS from <code class="text-primary">pages/</code> with MIME detection.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benchmarks -->
+    <section id="benchmarks" class="py-20 px-6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-4">Performance</h2>
+            <p class="text-gray-400 text-center mb-12 max-w-2xl mx-auto">Benchmarked on 8-core system with keep-alive enabled.</p>
+            <div class="grid md:grid-cols-3 gap-6 mb-12">
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-8 text-center">
+                    <div class="text-5xl font-bold gradient-text mb-2">11,042</div>
+                    <div class="text-gray-400">requests/sec</div>
+                    <div class="text-sm text-gray-500 mt-2">500 concurrent</div>
+                </div>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-8 text-center">
+                    <div class="text-5xl font-bold gradient-text mb-2">17.9</div>
+                    <div class="text-gray-400">ms latency</div>
+                    <div class="text-sm text-gray-500 mt-2">100 concurrent</div>
+                </div>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-8 text-center">
+                    <div class="text-5xl font-bold gradient-text mb-2">0</div>
+                    <div class="text-gray-400">dependencies</div>
+                    <div class="text-sm text-gray-500 mt-2">raw TCP sockets</div>
+                </div>
+            </div>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+                <table class="w-full">
+                    <thead class="bg-dark-700">
+                        <tr>
+                            <th class="text-left px-6 py-4 text-gray-400 font-medium">Scenario</th>
+                            <th class="text-left px-6 py-4 text-gray-400 font-medium">Concurrency</th>
+                            <th class="text-left px-6 py-4 text-gray-400 font-medium">Requests/sec</th>
+                            <th class="text-left px-6 py-4 text-gray-400 font-medium">Latency</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-dark-600">
+                        <tr>
+                            <td class="px-6 py-4">GET /ping</td>
+                            <td class="px-6 py-4 text-gray-400">100</td>
+                            <td class="px-6 py-4 text-primary font-mono">5,601</td>
+                            <td class="px-6 py-4 text-gray-400">17.9ms</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4">GET /ping</td>
+                            <td class="px-6 py-4 text-gray-400">500</td>
+                            <td class="px-6 py-4 text-primary font-mono">11,042</td>
+                            <td class="px-6 py-4 text-gray-400">45.3ms</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4">POST with body</td>
+                            <td class="px-6 py-4 text-gray-400">100</td>
+                            <td class="px-6 py-4 text-primary font-mono">5,773</td>
+                            <td class="px-6 py-4 text-gray-400">17.3ms</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section id="quickstart" class="py-20 px-6 bg-dark-800">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-4">Quick Start</h2>
+            <p class="text-gray-400 text-center mb-12">Up and running in 30 seconds.</p>
+            
+            <!-- Step 1 -->
+            <div class="mb-8">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="w-8 h-8 bg-primary text-black rounded-full flex items-center justify-center font-semibold text-sm">1</span>
+                    <h3 class="font-semibold">Install</h3>
+                </div>
+                <div class="bg-dark-900 border border-dark-600 rounded-xl p-4 overflow-x-auto">
+                    <pre class="text-gray-300"><code>go get github.com/codetesla51/raw-http@v1.0.0</code></pre>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="mb-8">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="w-8 h-8 bg-primary text-black rounded-full flex items-center justify-center font-semibold text-sm">2</span>
+                    <h3 class="font-semibold">Write your server</h3>
+                </div>
+                <div class="bg-dark-900 border border-dark-600 rounded-xl p-4 overflow-x-auto">
+                    <pre class="text-gray-300 text-sm"><code><span class="text-gray-500">package</span> main
+
+<span class="text-gray-500">import</span> <span class="text-primary">"github.com/codetesla51/raw-http/server"</span>
+
+<span class="text-gray-500">func</span> <span class="text-white">main</span>() {
+    router := server.<span class="text-primary">NewRouter</span>()
+
+    router.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/ping"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
+        <span class="text-gray-500">return</span> server.<span class="text-primary">CreateResponseBytes</span>(<span class="text-primary">"200"</span>, <span class="text-primary">"text/plain"</span>, <span class="text-primary">"OK"</span>, []<span class="text-gray-500">byte</span>(<span class="text-primary">"pong"</span>))
+    })
+
+    router.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/users/:id"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
+        userID := req.PathParams[<span class="text-primary">"id"</span>]
+        <span class="text-gray-500">return</span> server.<span class="text-primary">CreateResponseBytes</span>(<span class="text-primary">"200"</span>, <span class="text-primary">"text/plain"</span>, <span class="text-primary">"OK"</span>, []<span class="text-gray-500">byte</span>(userID))
+    })
+
+    <span class="text-gray-600">// See GitHub for full server setup with listeners</span>
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div>
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="w-8 h-8 bg-primary text-black rounded-full flex items-center justify-center font-semibold text-sm">3</span>
+                    <h3 class="font-semibold">Run</h3>
+                </div>
+                <div class="bg-dark-900 border border-dark-600 rounded-xl p-4 overflow-x-auto">
+                    <pre class="text-gray-300"><code>go run main.go
+<span class="text-gray-500"># Server listening on http://localhost:8080</span>
+
+curl http://localhost:8080/ping       <span class="text-gray-500"># pong</span>
+curl http://localhost:8080/users/42   <span class="text-gray-500"># 42</span></code></pre>
+                </div>
+            </div>
+
+            <div class="text-center mt-12">
+                <a href="https://github.com/codetesla51/raw-http#readme" target="_blank" class="inline-flex items-center gap-2 text-primary hover:underline">
+                    Read full documentation
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="py-20 px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-3xl font-bold mb-4">Ready to build?</h2>
+            <p class="text-gray-400 mb-8">Start building your next project with raw-http.</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="https://github.com/codetesla51/raw-http" target="_blank" class="bg-primary hover:bg-emerald-600 text-black font-semibold px-8 py-3 rounded-lg transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    View on GitHub
+                </a>
+                <a href="https://pkg.go.dev/github.com/codetesla51/raw-http" target="_blank" class="bg-dark-700 hover:bg-dark-600 border border-dark-600 px-8 py-3 rounded-lg transition">
+                    Go Documentation
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-dark-600 py-8 px-6">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-2 text-gray-400">
+                <span class="font-semibold"><span class="text-primary">raw</span>-http</span>
+                <span class="text-gray-600">•</span>
+                <span>MIT License</span>
+            </div>
+            <div class="text-gray-500 text-sm">
+                This page is served by raw-http
+            </div>
+            <a href="https://github.com/codetesla51" target="_blank" class="text-gray-400 hover:text-white transition">
+                @codetesla51
+            </a>
+        </div>
+    </footer>
+</body>
+</html>
