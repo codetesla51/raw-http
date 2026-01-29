@@ -30,6 +30,7 @@ func NewRouter() *Router {
 	}
 
 }
+
 // router instance with config
 func NewRouterWithConfig(config *Config) *Router {
 	return &Router{
@@ -53,23 +54,51 @@ func (r *Router) Register(method, path string, handler RouteHandler) {
 func (r *Router) HandleBytes(method, cleanPath string, queryMap, bodyMap map[string]string, browserName string) ([]byte, string) {
 	r.mu.RLock()
 	methodRoutes, exists := r.routes[method]
-	var handler RouteHandler
-	if exists {
-		handler, exists = methodRoutes[cleanPath]
-	}
 	r.mu.RUnlock()
 
-	if exists {
-		req := &Request{
-			Query:   queryMap,
-			Body:    bodyMap,
-			Browser: browserName,
-			Method:  method,
-			Path:    cleanPath,
-		}
-		return handler(req)
+	if !exists {
+		return serve404Bytes()
 	}
-	return serve404Bytes()
+
+	// Try to find a matching route
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var handler RouteHandler
+	var pathParams map[string]string
+	found := false
+
+	// First try exact match (faster)
+	if exactHandler, ok := methodRoutes[cleanPath]; ok {
+		handler = exactHandler
+		pathParams = make(map[string]string)
+		found = true
+	} else {
+		// Try pattern matching
+		for pattern, h := range methodRoutes {
+			params, matched := matchRoute(cleanPath, pattern)
+			if matched {
+				handler = h
+				pathParams = params
+				found = true
+				break
+			}
+		}
+	}
+
+	if !found {
+		return serve404Bytes()
+	}
+	req := &Request{
+		Method:     method,
+		Path:       cleanPath,
+		PathParams: pathParams, // ← The extracted params like {"id": "123"}
+		Query:      queryMap,
+		Body:       bodyMap,
+		Browser:    browserName,
+	}
+
+	return handler(req)
 }
 
 // Handle routes a request and returns response string (for compatibility)

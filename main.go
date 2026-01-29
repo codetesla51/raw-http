@@ -67,6 +67,11 @@ func main() {
 	router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
 		return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
 	})
+	router.Register("GET", "/users/:id", func(req *server.Request) ([]byte, string) {
+		userId := req.PathParams["id"]
+		response := []byte("user id:" + userId)
+		return server.CreateResponseBytes("200", "text/plain", "OK", response)
+	})
 	router.Register("GET", "/panic", func(req *server.Request) ([]byte, string) {
 		panic("test panic")
 	})

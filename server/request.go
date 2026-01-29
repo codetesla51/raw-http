@@ -13,12 +13,13 @@ import (
 
 // Request represents an incoming HTTP request
 type Request struct {
-	Method  string
-	Path    string
-	Query   map[string]string
-	Body    map[string]string
-	Headers map[string]string
-	Browser string
+	Method     string
+	Path       string
+	Query      map[string]string
+	PathParams map[string]string
+	Body       map[string]string
+	Headers    map[string]string
+	Browser    string
 }
 
 // readHTTPRequest reads HTTP request headers from a connection
@@ -141,6 +142,32 @@ func detectBrowser(userAgent string) string {
 	default:
 		return "Unknown Browser"
 	}
+}
+func matchRoute(requestPath string, routePattern string) (map[string]string, bool) {
+	// Split both into parts
+	requestParts := strings.Split(strings.Trim(requestPath, "/"), "/")
+	patternParts := strings.Split(strings.Trim(routePattern, "/"), "/")
+
+	// Must have same number of segments
+	if len(requestParts) != len(patternParts) {
+		return nil, false
+	}
+
+	// Extract parameters
+	params := make(map[string]string)
+
+	for i := 0; i < len(requestParts); i++ {
+		if strings.HasPrefix(patternParts[i], ":") {
+
+			paramName := patternParts[i][1:]
+			params[paramName] = requestParts[i]
+		} else if requestParts[i] != patternParts[i] {
+
+			return nil, false
+		}
+	}
+
+	return params, true
 }
 
 // --- Compatibility functions for tests ---
