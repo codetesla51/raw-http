@@ -40,6 +40,20 @@ raw-http is an HTTP/1.1 server implementation that handles:
 
 ## Installation
 
+### As a dependency
+
+```bash
+go get github.com/codetesla51/raw-http@v1.0.0
+```
+
+Then import in your code:
+
+```go
+import "github.com/codetesla51/raw-http/server"
+```
+
+### Build from source
+
 ```bash
 git clone https://github.com/codetesla51/raw-http.git
 cd raw-http
