@@ -1,6 +1,7 @@
 # Binaries
 raw-http
 raw-http.exe
+server_bin
 *.exe
 *.dll
 *.so
@@ -29,6 +30,3 @@ Thumbs.db
 *.tmp
 certs/
 certificates/
-
-# ARCHITECTURE.md is for local learning only
-ARCHITECTURE.md

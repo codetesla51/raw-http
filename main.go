@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
-	"html/template"
 	"log"
 	"net"
 	"os"
@@ -61,28 +59,41 @@ func main() {
 	// Create router and register routes
 	router := server.NewRouter()
 
-	router.Register("GET", "/welcome", homeHandler)
-	router.Register("GET", "/hello", handleHello)
-	router.Register("GET", "/login", loginHandler)
-	router.Register("POST", "/login", loginHandler)
+	// API endpoint with query parameter
+	router.Register("GET", "/data", func(req *server.Request) ([]byte, string) {
+		id := req.Query["id"]
+		if id == "" {
+			return server.Serve400("missing 'id' query parameter")
+		}
+		data := fmt.Sprintf(`{"id":"%s","info":"Data for id %s"}`, id, id)
+		return server.CreateResponseBytes("200", "application/json", "OK", []byte(data))
+	})
+
+	// User endpoint with path parameter
+	router.Register("GET", "/users/:id", func(req *server.Request) ([]byte, string) {
+		userID := req.PathParams["id"]
+		response := []byte("User: " + userID)
+		return server.CreateResponseBytes("200", "text/plain", "OK", response)
+	})
+
+	// POST endpoint with body parsing
+	router.Register("POST", "/api/create", func(req *server.Request) ([]byte, string) {
+		name := req.Body["name"]
+		if name == "" {
+			return server.Serve400("name field required")
+		}
+		response := []byte(`{"status":"created","name":"` + name + `"}`)
+		return server.CreateResponseBytes("201", "application/json", "Created", response)
+	})
+
+	// Health check endpoint
 	router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
 		return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
 	})
-	router.Register("GET", "/users/:id", func(req *server.Request) ([]byte, string) {
-		userId := req.PathParams["id"]
-		response := []byte("user id:" + userId)
-		return server.CreateResponseBytes("200", "text/plain", "OK", response)
-	})
+
+	// Error handling example (panic recovery)
 	router.Register("GET", "/panic", func(req *server.Request) ([]byte, string) {
-		panic("test panic")
-	})
-	router.Register("GET", "/data", func(req *server.Request) (response []byte, status string) {
-		id := req.Query["id"]
-		if id == "" {
-			return server.Serve400("Missing 'id' query parameter")
-		}
-		data := processData(id)
-		return server.CreateResponseBytes("200", "application/json", "OK", data)
+		panic("test panic - server will recover")
 	})
 
 	// HTTP listener
@@ -130,77 +141,4 @@ func main() {
 	}
 	time.Sleep(2 * time.Second)
 	log.Println("Server stopped.")
-}
-
-func processData(id string) []byte {
-	return []byte(fmt.Sprintf(`{"id":"%s","info":"This is some data related to id %s"}`, id, id))
-}
-
-func homeHandler(req *server.Request) ([]byte, string) {
-	t, err := template.ParseFiles("pages/welcome.html")
-	if err != nil {
-		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Could not load template"))
-	}
-
-	currentTime := time.Now()
-	formattedTime := currentTime.Format("15:04:05")
-	currentDate := currentTime.Weekday().String()
-
-	data := struct {
-		Title   string
-		Name    string
-		Browser string
-		Time    string
-		Day     string
-	}{
-		Title:   "My Home Page",
-		Name:    "John Doe",
-		Browser: req.Browser,
-		Time:    formattedTime,
-		Day:     currentDate,
-	}
-
-	var result bytes.Buffer
-	err = t.Execute(&result, data)
-	if err != nil {
-		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Template error"))
-	}
-	return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
-}
-
-func loginHandler(req *server.Request) ([]byte, string) {
-	var result bytes.Buffer
-	if req.Method == "GET" {
-		t, err := template.ParseFiles("pages/login.html")
-		if err != nil {
-			return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Could not load template"))
-		}
-		t.Execute(&result, nil)
-		return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
-	}
-
-	if req.Method == "POST" {
-		username := req.Body["username"]
-		password := req.Body["password"]
-		if username == "admin" && password == "secret" {
-			response := "<h1>Login Successful!</h1><p>Welcome " + username + "!</p>"
-			return server.CreateResponseBytes("200", "text/html", "OK", []byte(response))
-		}
-		return server.CreateResponseBytes("200", "text/html", "OK",
-			[]byte("<h1>Login Failed</h1><p>Wrong username or password</p>"))
-	}
-	return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
-}
-
-func handleHello(req *server.Request) ([]byte, string) {
-	var result bytes.Buffer
-	t, err := template.ParseFiles("pages/hello.html")
-	if err != nil {
-		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Could not load template"))
-	}
-	err = t.Execute(&result, nil)
-	if err != nil {
-		return server.CreateResponseBytes("500", "text/plain", "Error", []byte("Template error"))
-	}
-	return server.CreateResponseBytes("200", "text/html", "OK", result.Bytes())
 }

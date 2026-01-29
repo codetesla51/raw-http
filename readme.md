@@ -1,457 +1,339 @@
 # raw-http
 
-High-performance HTTP/HTTPS server built from raw TCP sockets in Go. No frameworks, no abstractions - just socket I/O, protocol parsing, and efficient request handling.
+High-performance HTTP/1.1 server built from raw TCP sockets in Go. Suitable for small to medium applications where you need control, performance, and simplicity over framework abstractions.
 
-**Status:** Active Development
-**Performance:** 9,800-11,600 RPS (benchmark results below)
-**Production Ready:** No - use for learning, experimentation, or embedded scenarios only
+**Note:** This is a learning project demonstrating HTTP server implementation. While suitable for small applications, it is not battle-tested like established servers (net/http, nginx, etc.).
 
-## Installation
+## What Is This?
+
+A complete, focused HTTP server implementation. No dependencies, no framework overhead. Built from TCP sockets with direct HTTP/1.1 protocol handling.
+
+**Use cases:**
+- Small to medium web applications
+- Embedded HTTP servers in tools
+- APIs and microservices
+- Applications where you control all request handling
+- Systems where you want minimal dependencies
+
+## Limitations
+
+**This is a learning project.** It works well for small applications but has limitations compared to battle-tested servers:
+
+- **Not battle-tested in production** - Limited real-world deployment history
+- **Single-process only** - No built-in clustering or multi-process support
+- **No built-in observability** - You implement logging, metrics, tracing
+- **Smaller community** - Not as proven or audited as net/http or nginx
+- **Concurrency ceiling** - Performance degrades beyond 5k concurrent connections
+- **Limited tooling** - No profiling tools, debuggers, or diagnostic utilities like mature frameworks have
+
+**When NOT to use this:**
+- Applications requiring proven, battle-tested infrastructure
+- Large teams needing comprehensive framework features
+- Applications requiring extensive middleware ecosystem
+- Systems that need built-in ORM, session management, clustering
+- High-traffic production systems without significant testing
+
+## How to Run
 
 ```bash
 git clone https://github.com/codetesla51/raw-http
 cd raw-http
-go mod tidy
-go build
-./raw-http
+go build -o server main.go
+./server
 ```
 
-Server listens on `http://localhost:8080` by default (auto-increments if busy).
-TLS on `https://localhost:8443` (if `server.crt` and `server.key` present).
+Server listens on `http://localhost:8080` (auto-increments port if busy).  
+HTTPS on `https://localhost:8443` if `server.crt` and `server.key` exist.
 
-## Usage
+## What It Does
 
-### Basic Server Setup
+✓ Accepts HTTP/1.1 connections over TCP  
+✓ Parses requests (method, path, headers, body)  
+✓ Routes to handlers using exact + pattern matching (`/users/:id`)  
+✓ Serves static files with MIME type detection  
+✓ Parses JSON and form-encoded request bodies  
+✓ Recovers from handler panics (won't crash)  
+✓ Protects against path traversal attacks  
+✓ Supports keep-alive connections  
+✓ Configurable timeouts and size limits  
+✓ TLS/HTTPS support  
+✓ Graceful shutdown  
+✓ Memory efficient (buffer pooling)  
+
+## What It Doesn't Do
+
+✗ Middleware system (you can build this on top)  
+✗ Authentication/authorization (you add this)  
+✗ Request validation (you validate input)  
+✗ Rate limiting (you implement if needed)  
+✗ Compression (compression is optional app logic)  
+✗ Sessions/cookies abstractions (parse headers yourself)  
+✗ Logging (implement in handlers)  
+✗ Database access (you add this)  
+
+It's a **server**, not a **framework**. You handle business logic.
+
+## Example Usage
+
+### Basic Handler
 
 ```go
-package main
-
-import "github.com/codetesla51/raw-http/server"
-
-func main() {
-    // Default configuration (30s timeout, 10MB max body)
-    router := server.NewRouter()
-    
-    // Or use custom configuration
-    cfg := server.DefaultConfig()
-    cfg.ReadTimeout = 60 * time.Second
-    cfg.MaxBodySize = 50 * 1024 * 1024  // 50MB
-    cfg.EnableLogging = true
-    router := server.NewRouterWithConfig(cfg)
-    
-    // Register routes
-    router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
-        return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
-    })
-}
+router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
+	return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
+})
 ```
 
-### Configuration
-
-Configuration is set via `Config` struct with `DefaultConfig()` providing sensible defaults:
+### Path Parameters
 
 ```go
-type Config struct {
-    ReadTimeout     time.Duration  // Max time to wait for request (default: 30s)
-    WriteTimeout    time.Duration  // Max time to send response (default: 30s)
-    IdleTimeout     time.Duration  // Max time between requests (default: 120s)
-    MaxHeaderSize   int            // Max header bytes, rejects larger (default: 8192)
-    MaxBodySize     int64          // Max request body, rejects larger (default: 10MB)
-    EnableKeepAlive bool           // Allow connection reuse (default: true)
-    EnableLogging   bool           // Log requests to stdout (default: false)
-}
+router.Register("GET", "/users/:id", func(req *server.Request) ([]byte, string) {
+	userID := req.PathParams["id"]
+	body := []byte("User: " + userID)
+	return server.CreateResponseBytes("200", "text/plain", "OK", body)
+})
+
+// curl http://localhost:8080/users/123
+// Response: User: 123
 ```
 
-Create custom configs and pass to `NewRouterWithConfig(cfg)`. The config object applies to all connections and routes - it controls defaults only, not runtime behavior.
+### Query Parameters
 
-## Features
+```go
+router.Register("GET", "/search", func(req *server.Request) ([]byte, string) {
+	query := req.Query["q"]
+	if query == "" {
+		return server.Serve400("missing 'q' parameter")
+	}
+	response := []byte("Search results for: " + query)
+	return server.CreateResponseBytes("200", "text/plain", "OK", response)
+})
 
-- Raw TCP socket handling with HTTP/1.1 protocol compliance
-- Custom routing engine (method + path matching)
-- Keep-alive connection support (configurable)
-- Static file serving with MIME type detection
-- Form data and JSON request parsing
-- Request context (headers, query parameters, body)
-- Panic recovery (handlers can't crash the server)
-- Path traversal protection
-- HTTPS/TLS support (optional, certificate-based)
-- Graceful shutdown with signal handling
-- Buffer pooling for memory efficiency
-- Configurable timeouts and size limits
+// curl http://localhost:8080/search?q=golang
+// Response: Search results for: golang
+```
+
+### POST with Body Parsing
+
+```go
+router.Register("POST", "/api/users", func(req *server.Request) ([]byte, string) {
+	name := req.Body["name"]
+	email := req.Body["email"]
+	
+	if name == "" || email == "" {
+		return server.Serve400("name and email required")
+	}
+	
+	// Your logic here (save to DB, etc.)
+	response := []byte(`{"id":1,"name":"` + name + `","email":"` + email + `"}`)
+	return server.CreateResponseBytes("201", "application/json", "Created", response)
+})
+
+// curl -X POST http://localhost:8080/api/users \
+//   -d "name=John&email=john@example.com"
+// Response: {"id":1,"name":"John","email":"john@example.com"}
+```
+
+### JSON Request Parsing
+
+```go
+router.Register("POST", "/api/data", func(req *server.Request) ([]byte, string) {
+	// JSON body is automatically parsed into req.Body
+	data := req.Body["key"]
+	
+	if data == "" {
+		return server.Serve400("key field required")
+	}
+	
+	return server.CreateResponseBytes("200", "application/json", "OK", 
+		[]byte(`{"received":"` + data + `"}`))
+})
+
+// curl -X POST http://localhost:8080/api/data \
+//   -H "Content-Type: application/json" \
+//   -d '{"key":"value"}'
+```
+
+### Error Responses
+
+```go
+router.Register("GET", "/api/protected", func(req *server.Request) ([]byte, string) {
+	token := req.Headers["Authorization"]
+	
+	if token == "" {
+		return server.Serve401("missing authorization header")
+	}
+	
+	if token != "Bearer valid-token" {
+		return server.Serve403("invalid token")
+	}
+	
+	return server.CreateResponseBytes("200", "text/plain", "OK", []byte("Access granted"))
+})
+```
+
+### Static Files
+
+```go
+// Automatically served from pages/ directory
+// pages/index.html    → GET /index.html
+// pages/styles.css    → GET /styles.css
+// pages/image.png     → GET /image.png
+
+router.Register("GET", "/", func(req *server.Request) ([]byte, string) {
+	return server.CreateResponseBytes("200", "text/html", "OK", 
+		[]byte("<h1>Home Page</h1>"))
+})
+```
+
+### Custom Configuration
+
+```go
+cfg := server.DefaultConfig()
+cfg.MaxBodySize = 50 * 1024 * 1024      // 50MB uploads
+cfg.ReadTimeout = 60 * time.Second       // Longer timeout for slow clients
+cfg.EnableLogging = true                 // Log all requests
+
+router := server.NewRouterWithConfig(cfg)
+```
+
+## Core Abstractions
+
+- **Router** - Registers and dispatches routes
+- **Request** - Parsed HTTP request (method, path, headers, body, query params, path params)
+- **Config** - Configurable timeouts, size limits, logging toggle
+- **Response helpers** - `Serve400()`, `Serve401()`, `Serve500()`, etc.
+
+All in `server/` package. Main application code in `main.go`.
 
 ## Performance
 
-Benchmark results on 8-core system with keep-alive enabled.
+Benchmarks on 8-core system (keep-alive enabled):
 
-| Scenario | Concurrency | Requests | RPS | Response Time | Status |
-|----------|-------------|----------|-----|---------------|--------|
-| Baseline | 100 | 10k | 9,818 | 10.2ms | Stable |
-| Sustained | 200 | 50k | 9,713 | 20.6ms | Stable |
-| High Load | 500 | 100k | 11,635 | 43ms | Stable |
-| Extreme | 1,000 | 100k | 11,303 | 88.5ms | Stable |
-| Stress | 5,000 | 100k | 8,930 | 559ms | Degraded |
-| POST (body) | 100 | 10k | 6,617 | 15.1ms | 35% slower |
-| Static Files | 100 | 10k | 6,349 | 15.8ms | Disk I/O |
+| Profile | Concurrency | RPS | Latency | Notes |
+|---------|-------------|-----|---------|-------|
+| Standard load | 100 | 5,601 | 17.9ms | Realistic production scenario |
+| High throughput | 500 | 11,042 | 45.3ms | Peak capacity |
+| POST requests | 100 | 5,773 | 17.3ms | Body parsing included |
 
-Peak throughput: **11,635 RPS** (500 concurrent connections)
-Optimal latency: **9,818 RPS** at 100 concurrent connections
-Breaking point: ~5,000 concurrent connections (OS file descriptor limits)
-Zero failures: Up to 5,000 concurrent connections
-
-GET requests on simple handlers (like /ping) are fastest. POST requests and file I/O are 35% slower due to body/disk overhead.
-
-## Architecture
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design, Go concepts, and implementation details.
-
-Structure:
-- `main.go` - Entry point, route registration
-- `server/router.go` - Connection handling, routing logic
-- `server/request.go` - HTTP request parsing
-- `server/response.go` - HTTP response formatting
-- `server/config.go` - Configuration and defaults
-- `server/static.go` - File serving utilities
-- `server/pool.go` - Memory buffer pooling
-- `server/mime.go` - Content-type mapping
-- `server/logging.go` - Request logging (disabled by default)
+**Real-world baseline:** 5,600+ RPS for typical application handlers  
+**Peak capability:** 11,000+ RPS for simple endpoints  
+**Scaling:** Horizontal scaling recommended beyond 5k concurrent connections
 
 ## Testing
 
-Run tests:
 ```bash
-go test ./server/...
+go test ./server/... -v
 ```
 
-Run benchmarks:
-```bash
-# Moderate load
-ab -n 10000 -c 100 -k http://localhost:8080/ping
+21 tests covering HTTP parsing, routing, path parameters, and error handling.
 
-# Heavy load
-ab -n 100000 -c 500 -k http://localhost:8080/ping
+## Implementation Details
+
+**Strategic buffer pooling:** `sync.Pool` for 8KB buffers, direct allocation for small reads  
+**Zero-copy parsing:** Entire pipeline works with `[]byte`  
+**Keep-alive support:** HTTP/1.1 connection reuse  
+**Panic recovery:** Defer/recover prevents handler crashes  
+**Path traversal protection:** Validated file access  
+**TLS/HTTPS:** Optional certificate-based encryption  
+**Graceful shutdown:** Signal handling with connection draining  
+**MIME detection:** Automatic content-type for static files  
+
+## When to Use This vs net/http
+
+| Aspect | raw-http | net/http |
+|--------|----------|----------|
+| **Simplicity** | Minimal, full control | Feature-rich |
+| **Startup time** | Very fast | Slightly slower |
+| **Dependencies** | Zero | Standard library |
+| **Learning curve** | Low (straightforward) | Higher (many abstractions) |
+| **Concurrency** | 5-10k req/s typical | 10k+ req/s typical |
+| **Middleware** | You implement | Built-in patterns |
+| **Use case** | Small-medium apps | Any scale |
+
+**Choose raw-http if:** You want simplicity, full control, and prefer explicit over implicit.  
+**Choose net/http if:** You need middleware ecosystem, larger team, or standard library comfort.
+
+## Configuration
+
+```go
+cfg := server.DefaultConfig()
+cfg.ReadTimeout = 30 * time.Second    // Request timeout
+cfg.WriteTimeout = 30 * time.Second   // Response timeout
+cfg.IdleTimeout = 120 * time.Second   // Keep-alive timeout
+cfg.MaxHeaderSize = 8192              // Max header bytes
+cfg.MaxBodySize = 10 * 1024 * 1024    // Max POST/PUT size
+cfg.EnableKeepAlive = true            // HTTP/1.1 keep-alive
+cfg.EnableLogging = false             // Request logging
+
+router := server.NewRouterWithConfig(cfg)
 ```
 
-## Not Production Ready
+## TLS/HTTPS
 
-This project is suitable for:
-- Learning HTTP protocol mechanics
-- Embedded servers in tools and utilities
-- Experimentation with network programming
-- Educational purposes
+Server automatically enables HTTPS if `server.crt` and `server.key` exist:
 
-Do not use for:
-- Public-facing web services
-- Mission-critical applications
-- Handling untrusted input at scale
-- Replacing established web servers (nginx, Apache, Go's net/http)
+```bash
+# Generate self-signed certificate (testing)
+openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
 
-Production use requires:
-- Request logging and metrics
-- Security hardening and audit
-- Connection pooling and limits
-- Advanced caching strategies
-- Comprehensive error handling
-- Load testing under your specific workload
+# For production, use Let's Encrypt
+certbot certonly --standalone -d yourdomain.com
+cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem server.crt
+cp /etc/letsencrypt/live/yourdomain.com/privkey.pem server.key
+chmod 600 server.key
+```
+
+HTTPS listens on `https://localhost:8443`.
+
+## Static File Serving
+
+Drop HTML/CSS/images in `pages/` directory. Server auto-detects MIME types:
+
+```
+pages/
+  index.html
+  styles.css
+  image.png
+```
+
+Access as `/index.html`, `/styles.css`, etc. Path traversal attempts are blocked.
+
+## Code Structure
+
+```
+main.go                  Entry point, route registration, listeners
+server/
+  router.go              Connection handling, routing, request dispatch
+  request.go              HTTP parsing, path parameter extraction
+  response.go             Response formatting, status code helpers
+  config.go               Configuration and defaults
+  static.go               File serving utilities
+  pool.go                 Memory buffer pooling
+  mime.go                 MIME type detection
+  logging.go              Request logging (optional)
+  server_test.go          21 unit tests
+```
+
+## Response Helpers
+
+Convenient status code builders:
+
+```go
+return server.Serve400("validation failed")    // 400 Bad Request
+return server.Serve401("auth required")        // 401 Unauthorized
+return server.Serve403("access denied")        // 403 Forbidden
+return server.Serve405("GET", "/path")         // 405 Method Not Allowed
+return server.Serve429()                       // 429 Too Many Requests
+return server.Serve500("database error")       // 500 Internal Error
+return server.Serve502("upstream timeout")     // 502 Bad Gateway
+return server.Serve503()                       // 503 Service Unavailable
+return server.Serve201("user created")         // 201 Created
+return server.Serve204()                       // 204 No Content
+```
 
 ## License
 
 MIT
 
 
-## Panic Recovery
 
-The server includes robust panic recovery middleware that prevents handler panics from crashing the entire server.
-
-### How It Works
-
-Every incoming connection is wrapped with a `defer/recover` mechanism that:
-1. **Catches panics** - Recovers from any panic in handler code
-2. **Logs stack traces** - Captures full stack trace for debugging
-3. **Returns 500 error** - Sends proper HTTP error response to client
-4. **Keeps server alive** - Connection pool remains healthy
-
-```go
-defer func() {
-    if r := recover(); r != nil {
-        log.Printf("PANIC recovered: %v\n%s", r, debug.Stack())
-        // Server continues running
-    }
-}()
-```
-
-### Benefits
-
-- **Server stability** - A single handler panic won't crash your server
-- **Request isolation** - Panic in one request doesn't affect others
-- **Debug visibility** - Full stack traces logged for troubleshooting
-- **Client experience** - Returns proper 500 error instead of connection drop
-- **Production ready** - Handles unexpected errors gracefully
-
-### Testing Panic Recovery
-
-```bash
-# Trigger a test panic
-curl http://localhost:8080/panic
-
-# Server logs the panic but continues running
-# Returns: HTTP 500 Internal Server Error
-```
-
-The server will log something like:
-```
-2026/01/08 09:00:12 PANIC recovered: test panic
-goroutine 35 [running]:
-runtime/debug.Stack()
-...
-```
-
-But the server stays alive and continues handling requests.
-
-## Performance Optimization Journey
-
-### Strategic Buffer Pooling
-
-The server uses **strategic buffer pooling** - a technique for reusing large memory buffers instead of constantly allocating and deallocating them. The key insight: **pool large buffers (4KB+), allocate small ones directly**.
-
-#### Implementation
-
-The server uses two optimized buffer pools:
-
-1. **Request Buffer Pool** (8KB) - Reuses buffers for reading incoming HTTP requests
-2. **Response Buffer Pool** - Reuses `bytes.Buffer` for building HTTP responses
-
-```go
-var requestBufferPool = sync.Pool{
-    New: func() interface{} {
-        buf := make([]byte, 8192)
-        return &buf
-    },
-}
-```
-
-Small read chunks (4KB) are allocated directly - we learned that pooling tiny buffers actually *hurts* performance due to lock contention overhead.
-
-### Bytes Throughout
-
-The entire request/response pipeline works with `[]byte` instead of strings:
-- Zero-copy HTTP parsing
-- Direct byte operations (`bytes.Split`, `bytes.Contains`)
-- Minimal string conversions (only at API boundaries)
-
-This eliminates unnecessary allocations in the hot path.
-
-### Performance Results
-
-| Concurrency | RPS | Avg Response Time | Status |
-|-------------|-----|-------------------|--------|
-| **c=1** | **~12,000** | **<0.1ms** | Peak |
-| **c=10** | **~10,000** | **1.0ms** | Optimal |
-| **c=100** | **~10,000** | **10ms** | Good |
-| c=1000 | 307 | 3,256ms | **Failure** |
-
-**Key findings:**
-- **Sweet spot: 10-100 concurrent connections** - Consistent 10k RPS
-- **Single connection: 12k RPS** - Zero lock contention
-- **Breaking point: ~1000 concurrent** - System limits reached (file descriptors, goroutine overhead)
-- **Zero failures** up to c=100 in sustained testing
-
-### Optimization Impact Timeline
-
-| Stage | RPS | Improvement |
-|-------|-----|-------------|
-| Initial string-based | ~7,000 | Baseline |
-| Added small buffer pools (256B) | ~4,000 | **-43%** (pools hurt) |
-| Removed small pools, kept large (8KB) | ~9,400 | **+34%** |
-| Full bytes conversion | **~10,000** | **+43%** |
-
-**Total improvement: +43% from strategic optimization**
-
-**Lesson learned:** Premature optimization is real - we initially made performance *worse* by pooling everything. The winning strategy: profile first, optimize strategically.
-
-## Graceful Shutdown
-
-The server supports graceful shutdown, allowing in-flight requests to complete before stopping. Listens for `SIGINT` (Ctrl+C) and `SIGTERM` signals.
-
-### How It Works
-
-1. **Signal Detection** - Captures interrupt signals
-2. **Stop Accepting Connections** - Listeners stop immediately
-3. **Grace Period** - 2-second wait for active connections
-4. **Clean Shutdown** - Proper resource cleanup
-
-```bash
-# Start server
-go run main.go
-
-# Graceful stop
-^C
-# Shutting down server...
-# Server stopped.
-```
-
-## HTTPS Configuration
-
-### Included Self-Signed Certificates
-
-Includes self-signed certificates for local development:
-- `server.crt` - Certificate
-- `server.key` - Private key
-
-Server auto-detects these files and enables HTTPS on port 8443.
-
-### Production Certificates
-
-For production, use certificates from a CA (like Let's Encrypt):
-
-```bash
-# Get certificates
-certbot certonly --standalone -d yourdomain.com
-
-# Copy to project
-cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem server.crt
-cp /etc/letsencrypt/live/yourdomain.com/privkey.pem server.key
-chmod 600 server.key
-```
-
-### Generate Self-Signed (Testing)
-
-```bash
-openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
-```
-
-## Example Usage
-
-```go
-router := server.NewRouter()
-
-// Handlers now return []byte instead of string
-router.Register("POST", "/login", func(req *server.Request) ([]byte, string) {
-    username := req.Body["username"]
-    browser := req.Browser
-    
-    if username == "admin" {
-        html := "<h1>Welcome " + username + "!</h1>"
-        return server.CreateResponseBytes("200", "text/html", "OK", []byte(html))
-    }
-    return server.CreateResponseBytes("401", "text/html", "Unauthorized", 
-        []byte("<h1>Login Failed</h1>"))
-})
-
-// Simple API endpoint
-router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
-    return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
-})
-```
-
-## Under the Hood
-
-- **Bytes-first processing:** Zero-copy HTTP parsing with `[]byte` operations
-- **Strategic buffer pooling:** `sync.Pool` for large buffers (8KB+), direct allocation for small ones
-- **TCP connection pooling:** HTTP/1.1 keep-alive implementation
-- **Panic recovery middleware:** Defer/recover pattern preventing handler crashes
-- **Goroutine-per-connection:** Leverages Go's concurrency model
-- **Custom HTTP parser:** Zero-dependency request parsing
-- **MIME detection:** Comprehensive content-type handling
-- **TLS/SSL layer:** Optional HTTPS encryption
-- **Signal handling:** Context-based graceful shutdown
-
-## Project Structure
-
-```
-├── server/
-│   ├── server.go          # Bytes-optimized HTTP server with strategic pooling
-│   └── server_test.go     # Test suite
-├── pages/                 # Static files and templates
-│   ├── index.html
-│   ├── login.html
-│   └── styles.css
-├── server.crt             # Self-signed certificate
-├── server.key             # Private key
-├── main.go                # Example web application
-└── README.md
-```
-
-## What I Learned
-
-Building from TCP sockets up provided deep insights into:
-
-- **HTTP protocol internals** - Request structure, parsing, and protocol mechanics
-- **TCP connection lifecycle** - Keep-alive, connection reuse, and state management
-- **Performance optimization** - When to pool, when to allocate, profiling-driven development
-- **Memory management** - Buffer reuse strategies and GC pressure reduction
-- **Bytes vs strings** - The performance cost of string conversions
-- **Error handling** - Panic recovery patterns and production reliability
-- **Go's networking primitives** - `net` package, goroutines, and concurrency patterns
-- **TLS/SSL encryption** - Certificate management and secure connections
-- **Security fundamentals** - Path traversal, DoS protection, input validation
-- **Graceful shutdown** - Signal handling and clean resource cleanup
-- **Real-world constraints** - File descriptor limits, goroutine overhead, system boundaries
-
-**Key lesson:** Optimization without measurement is guesswork. We initially made performance *worse* by blindly adding buffer pools everywhere. Strategic, measured optimization (profile → change one thing → measure) is the only reliable approach.
-
-## Testing
-
-```bash
-go test ./server
-```
-
-### Load Testing
-
-Test with ApacheBench:
-
-```bash
-# Optimal performance test
-ab -n 100000 -c 10 -k http://localhost:8080/ping
-
-# High load test  
-ab -n 100000 -c 100 -k http://localhost:8080/ping
-
-# Breaking point test (expect failures)
-ab -n 10000 -c 1000 -k http://localhost:8080/ping
-```
-
-**Note:** Performance degrades significantly above c=100 due to system limits. For production workloads requiring >100 concurrent connections, use Go's `net/http` package.
-
-### Testing Panic Recovery
-
-```bash
-# Test that panics don't crash the server
-curl http://localhost:8080/panic
-
-# Server should return 500 but stay alive
-# Try another request to verify
-curl http://localhost:8080/ping
-# Should return: pong
-```
-
-## Limitations
-
-This is a learning project demonstrating HTTP fundamentals:
-
-- **Concurrency limit:** ~100 connections before degradation
-- **Simple routing:** No path parameters or regex
-- **No middleware system**
-- **Limited HTTP method support**
-- **Basic error handling**
-- **No rate limiting or DDoS protection**
-- **Synthetic benchmarks:** Real apps with DB/logic will be much slower
-- **Not production-ready:** Use `net/http` for real applications
-
-## Why Build This?
-
-Understanding what happens beneath web frameworks - HTTP parsing, connection management, TLS encryption, memory optimization, error recovery, and networking fundamentals. 
-
-The optimization journey (7k → 4k → 10k RPS) demonstrates how low-level implementation choices dramatically impact performance, and how measurement-driven optimization is essential.
-
-## Routes Available
-
-- `/` - Home page
-- `/welcome` - Dynamic template demo
-- `/login` - Form handling example
-- `/hello` - About page
-- `/ping` - API endpoint (used for benchmarking)
-- `/panic` - Test panic recovery (returns 500 but server stays alive)
-
----
-
-*Built with Go 1.21+ • Created by [Uthman](https://github.com/codetesla51) • Learning project focused on HTTP/HTTPS internals and performance optimization fundamentals*

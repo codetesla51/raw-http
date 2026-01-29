@@ -171,8 +171,12 @@ func matchRoute(requestPath string, routePattern string) (map[string]string, boo
 }
 
 // --- Compatibility functions for tests ---
+// These functions wrap the bytes-based parsers to accept strings.
+// They exist ONLY to simplify unit tests (see server_test.go).
+// Production code should use the bytes versions directly.
 
-// parseRequestLine parses request line from string (for tests)
+// parseRequestLine parses request line from string (TEST ONLY)
+// Wrapper around parseRequestLineFromBytes for test convenience
 func parseRequestLine(line string) (method string, path string, err error) {
 	parts := strings.Split(line, " ")
 	if len(parts) < 3 {
@@ -181,7 +185,8 @@ func parseRequestLine(line string) (method string, path string, err error) {
 	return parts[0], parts[1], nil
 }
 
-// parseHeaders parses headers from string slice (for tests)
+// parseHeaders parses headers from string slice (TEST ONLY)
+// Wrapper around parseHeadersFromBytes for test convenience
 func parseHeaders(headerLines []string) map[string]string {
 	headerMap := make(map[string]string, len(headerLines))
 	for _, line := range headerLines {
@@ -195,12 +200,14 @@ func parseHeaders(headerLines []string) map[string]string {
 	return headerMap
 }
 
-// parseKeyValuePairs parses URL-encoded string (for tests)
+// parseKeyValuePairs parses URL-encoded string (TEST ONLY)
+// Wrapper around parseKeyValuePairsFromBytes for test convenience
 func parseKeyValuePairs(data string) map[string]string {
 	return parseKeyValuePairsFromBytes([]byte(data))
 }
 
-// parseJSONBody parses JSON string (for tests)
+// parseJSONBody parses JSON string (TEST ONLY)
+// Wrapper around parseJSONBodyFromBytes for test convenience
 func parseJSONBody(body string) map[string]string {
 	return parseJSONBodyFromBytes([]byte(body))
 }

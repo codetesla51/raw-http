@@ -283,3 +283,324 @@ func TestIntegration(t *testing.T) {
 		t.Error("Expected 'pong' in response body")
 	}
 }
+
+// Test path parameter extraction with pattern matching
+func TestPathParameterExtraction(t *testing.T) {
+	tests := []struct {
+		pattern        string
+		path           string
+		shouldMatch    bool
+		expectedParams map[string]string
+	}{
+		{
+			"/users/:id",
+			"/users/123",
+			true,
+			map[string]string{"id": "123"},
+		},
+		{
+			"/users/:id",
+			"/users/john",
+			true,
+			map[string]string{"id": "john"},
+		},
+		{
+			"/api/v1/:version/users/:id",
+			"/api/v1/stable/users/456",
+			true,
+			map[string]string{"version": "stable", "id": "456"},
+		},
+		{
+			"/users/:id",
+			"/products/123",
+			false,
+			nil,
+		},
+		{
+			"/users/:id",
+			"/users/123/posts",
+			false,
+			nil,
+		},
+	}
+
+	for _, test := range tests {
+		params, matched := matchRoute(test.path, test.pattern)
+
+		if matched != test.shouldMatch {
+			t.Errorf("Pattern %s, path %s: expected matched=%v, got %v",
+				test.pattern, test.path, test.shouldMatch, matched)
+			continue
+		}
+
+		if test.shouldMatch {
+			if len(params) != len(test.expectedParams) {
+				t.Errorf("Expected %d params, got %d", len(test.expectedParams), len(params))
+				continue
+			}
+
+			for key, expectedValue := range test.expectedParams {
+				if actualValue, exists := params[key]; !exists || actualValue != expectedValue {
+					t.Errorf("Expected %s=%s, got %s=%s", key, expectedValue, key, actualValue)
+				}
+			}
+		}
+	}
+}
+
+// Test response helpers
+func TestResponseHelpers(t *testing.T) {
+	tests := []struct {
+		name           string
+		fn             func() ([]byte, string)
+		expectedStatus string
+		shouldContain  string
+	}{
+		{"Serve400", func() ([]byte, string) { return Serve400("test error") }, "400", "test error"},
+		{"Serve401", func() ([]byte, string) { return Serve401("auth failed") }, "401", "auth failed"},
+		{"Serve403", func() ([]byte, string) { return Serve403("forbidden") }, "403", "forbidden"},
+		{"Serve429", func() ([]byte, string) { return Serve429("rate limit") }, "429", "rate limit"},
+		{"Serve500", func() ([]byte, string) { return Serve500("server error") }, "500", "server error"},
+		{"Serve201", func() ([]byte, string) { return Serve201("created") }, "201", "created"},
+		{"Serve204", func() ([]byte, string) { return Serve204() }, "204", ""},
+	}
+
+	for _, test := range tests {
+		response, status := test.fn()
+
+		if status != test.expectedStatus {
+			t.Errorf("%s: expected status %s, got %s", test.name, test.expectedStatus, status)
+		}
+
+		if test.shouldContain != "" && !strings.Contains(string(response), test.shouldContain) {
+			t.Errorf("%s: response doesn't contain '%s'", test.name, test.shouldContain)
+		}
+	}
+}
+
+// Test config defaults
+func TestConfigDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.ReadTimeout <= 0 {
+		t.Error("ReadTimeout should be > 0")
+	}
+
+	if cfg.WriteTimeout <= 0 {
+		t.Error("WriteTimeout should be > 0")
+	}
+
+	if cfg.MaxBodySize <= 0 {
+		t.Error("MaxBodySize should be > 0")
+	}
+
+	if cfg.MaxHeaderSize <= 0 {
+		t.Error("MaxHeaderSize should be > 0")
+	}
+
+	if !cfg.EnableKeepAlive {
+		t.Error("EnableKeepAlive should be true by default")
+	}
+
+	if cfg.EnableLogging {
+		t.Error("EnableLogging should be false by default (performance)")
+	}
+}
+
+// Test request struct population
+func TestRequestStructPopulation(t *testing.T) {
+	router := NewRouter()
+
+	router.Register("POST", "/api/:version/users/:id", func(req *Request) ([]byte, string) {
+		// Verify path params extracted
+		if req.PathParams["version"] != "v1" {
+			t.Errorf("Expected version=v1, got %s", req.PathParams["version"])
+		}
+
+		if req.PathParams["id"] != "42" {
+			t.Errorf("Expected id=42, got %s", req.PathParams["id"])
+		}
+
+		// Verify other request fields
+		if req.Method != "POST" {
+			t.Errorf("Expected method=POST, got %s", req.Method)
+		}
+
+		if req.Path != "/api/v1/users/42" {
+			t.Errorf("Expected path=/api/v1/users/42, got %s", req.Path)
+		}
+
+		return CreateResponseBytes("200", "text/plain", "OK", []byte("verified"))
+	})
+
+	queryMap := map[string]string{"filter": "active"}
+	bodyMap := map[string]string{"name": "John"}
+
+	response, status := router.Handle("POST", "/api/v1/users/42", queryMap, bodyMap, "Chrome")
+
+	if status != "200" {
+		t.Errorf("Expected status 200, got %s", status)
+	}
+
+	if !strings.Contains(response, "verified") {
+		t.Error("Handler verification failed")
+	}
+}
+
+// Test static file serving
+func TestStaticFileServing(t *testing.T) {
+	router := NewRouter()
+
+	// Test that / routes to index.html
+	response, status := router.Handle("GET", "/", nil, nil, "Chrome")
+
+	if status != "200" {
+		t.Logf("Note: /index.html not found (expected if pages/index.html doesn't exist)")
+	} else {
+		if !strings.Contains(response, "HTTP/1.1") {
+			t.Error("Response should contain HTTP headers")
+		}
+	}
+}
+
+// Test headers parsing
+func TestHeadersParsing(t *testing.T) {
+	headerLines := []string{
+		"Host: localhost:8080",
+		"User-Agent: curl/7.68.0",
+		"Accept: */*",
+		"Content-Type: application/json",
+	}
+
+	headers := parseHeaders(headerLines)
+
+	expectedHeaders := map[string]string{
+		"Host":         "localhost:8080",
+		"User-Agent":   "curl/7.68.0",
+		"Accept":       "*/*",
+		"Content-Type": "application/json",
+	}
+
+	for key, expectedValue := range expectedHeaders {
+		if actualValue, exists := headers[key]; !exists || actualValue != expectedValue {
+			t.Errorf("Expected %s: %s, got %s", key, expectedValue, actualValue)
+		}
+	}
+}
+
+// Test browser detection
+func TestBrowserDetection(t *testing.T) {
+	tests := []struct {
+		userAgent string
+		expected  string
+	}{
+		{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", "Chrome"},
+		{"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0", "Firefox"},
+		{"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15", "Safari"},
+		{"curl/7.68.0", "Unknown Browser"},
+	}
+
+	for _, test := range tests {
+		result := detectBrowser(test.userAgent)
+		if result != test.expected {
+			t.Errorf("For UA %s: expected %s, got %s", test.userAgent, test.expected, result)
+		}
+	}
+}
+
+// Test CreateResponseBytes
+func TestCreateResponseBytes(t *testing.T) {
+	response, status := CreateResponseBytes("200", "application/json", "OK", []byte(`{"key":"value"}`))
+
+	if status != "200" {
+		t.Errorf("Expected status 200, got %s", status)
+	}
+
+	responseStr := string(response)
+
+	if !strings.Contains(responseStr, "HTTP/1.1 200 OK") {
+		t.Error("Response should contain status line")
+	}
+
+	if !strings.Contains(responseStr, "Content-Type: application/json") {
+		t.Error("Response should contain Content-Type header")
+	}
+
+	if !strings.Contains(responseStr, `{"key":"value"}`) {
+		t.Error("Response should contain body")
+	}
+
+	if !strings.Contains(responseStr, "Content-Length:") {
+		t.Error("Response should contain Content-Length")
+	}
+}
+
+// Test multiple exact routes
+func TestMultipleExactRoutes(t *testing.T) {
+	router := NewRouter()
+
+	router.Register("GET", "/api/users", func(req *Request) ([]byte, string) {
+		return CreateResponseBytes("200", "text/plain", "OK", []byte("users list"))
+	})
+
+	router.Register("GET", "/api/products", func(req *Request) ([]byte, string) {
+		return CreateResponseBytes("200", "text/plain", "OK", []byte("products list"))
+	})
+
+	router.Register("GET", "/api/orders", func(req *Request) ([]byte, string) {
+		return CreateResponseBytes("200", "text/plain", "OK", []byte("orders list"))
+	})
+
+	tests := []struct {
+		path     string
+		expected string
+	}{
+		{"/api/users", "users list"},
+		{"/api/products", "products list"},
+		{"/api/orders", "orders list"},
+	}
+
+	for _, test := range tests {
+		response, status := router.Handle("GET", test.path, nil, nil, "Chrome")
+
+		if status != "200" {
+			t.Errorf("Expected status 200 for %s, got %s", test.path, status)
+		}
+
+		if !strings.Contains(response, test.expected) {
+			t.Errorf("Expected '%s' in response for %s", test.expected, test.path)
+		}
+	}
+}
+
+// Test POST with body
+func TestPostWithBody(t *testing.T) {
+	router := NewRouter()
+
+	router.Register("POST", "/api/users", func(req *Request) ([]byte, string) {
+		name := req.Body["name"]
+		email := req.Body["email"]
+
+		if name == "" || email == "" {
+			return Serve400("name and email required")
+		}
+
+		response := "User created: " + name + " (" + email + ")"
+		return CreateResponseBytes("201", "text/plain", "Created", []byte(response))
+	})
+
+	bodyMap := map[string]string{
+		"name":  "John Doe",
+		"email": "john@example.com",
+	}
+
+	response, status := router.Handle("POST", "/api/users", nil, bodyMap, "Chrome")
+
+	if status != "201" {
+		t.Errorf("Expected status 201, got %s", status)
+	}
+
+	if !strings.Contains(response, "John Doe") {
+		t.Error("Response should contain user name")
+	}
+}

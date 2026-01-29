@@ -50,6 +50,9 @@ func serve404Bytes() ([]byte, string) {
 	return CreateResponseBytes("404", "text/html", "Not Found", content)
 }
 func Serve400(msg string) ([]byte, string) {
+	if msg == "" {
+		msg = "Bad Request"
+	}
 	return CreateResponseBytes("400", "text/plain", "Bad Request", []byte(msg))
 }
 
