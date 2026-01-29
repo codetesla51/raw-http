@@ -223,7 +223,7 @@ func TestRequestStruct(t *testing.T) {
 	}
 }
 
-// Integration test - starts a server and makes a real request
+// Integration test
 func TestIntegration(t *testing.T) {
 	router := NewRouter()
 

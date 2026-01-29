@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"fmt"
 	"html/template"
 	"log"
 	"net"
@@ -75,6 +76,14 @@ func main() {
 	router.Register("GET", "/panic", func(req *server.Request) ([]byte, string) {
 		panic("test panic")
 	})
+	router.Register("GET", "/data", func(req *server.Request) (response []byte, status string) {
+		id := req.Query["id"]
+		if id == "" {
+			return server.Serve400("Missing 'id' query parameter")
+		}
+		data := processData(id)
+		return server.CreateResponseBytes("200", "application/json", "OK", data)
+	})
 
 	// HTTP listener
 	go func() {
@@ -121,6 +130,10 @@ func main() {
 	}
 	time.Sleep(2 * time.Second)
 	log.Println("Server stopped.")
+}
+
+func processData(id string) []byte {
+	return []byte(fmt.Sprintf(`{"id":"%s","info":"This is some data related to id %s"}`, id, id))
 }
 
 func homeHandler(req *server.Request) ([]byte, string) {

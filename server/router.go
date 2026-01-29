@@ -68,7 +68,6 @@ func (r *Router) HandleBytes(method, cleanPath string, queryMap, bodyMap map[str
 	var pathParams map[string]string
 	found := false
 
-	// First try exact match (faster)
 	if exactHandler, ok := methodRoutes[cleanPath]; ok {
 		handler = exactHandler
 		pathParams = make(map[string]string)
@@ -92,7 +91,7 @@ func (r *Router) HandleBytes(method, cleanPath string, queryMap, bodyMap map[str
 	req := &Request{
 		Method:     method,
 		Path:       cleanPath,
-		PathParams: pathParams, // ← The extracted params like {"id": "123"}
+		PathParams: pathParams,
 		Query:      queryMap,
 		Body:       bodyMap,
 		Browser:    browserName,
