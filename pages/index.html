@@ -241,21 +241,27 @@
                 <div class="bg-dark-900 border border-dark-600 rounded-xl p-4 overflow-x-auto">
                     <pre class="text-gray-300 text-sm"><code><span class="text-gray-500">package</span> main
 
-<span class="text-gray-500">import</span> <span class="text-primary">"github.com/codetesla51/raw-http/server"</span>
+<span class="text-gray-500">import</span> (
+    <span class="text-primary">"log"</span>
+    <span class="text-primary">"github.com/codetesla51/raw-http/server"</span>
+)
 
 <span class="text-gray-500">func</span> <span class="text-white">main</span>() {
-    router := server.<span class="text-primary">NewRouter</span>()
+    srv := server.<span class="text-primary">NewServer</span>(<span class="text-primary">":8080"</span>)
 
-    router.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/ping"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
+    srv.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/ping"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
         <span class="text-gray-500">return</span> server.<span class="text-primary">CreateResponseBytes</span>(<span class="text-primary">"200"</span>, <span class="text-primary">"text/plain"</span>, <span class="text-primary">"OK"</span>, []<span class="text-gray-500">byte</span>(<span class="text-primary">"pong"</span>))
     })
 
-    router.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/users/:id"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
+    srv.<span class="text-primary">Register</span>(<span class="text-primary">"GET"</span>, <span class="text-primary">"/users/:id"</span>, <span class="text-gray-500">func</span>(req *server.Request) ([]<span class="text-gray-500">byte</span>, <span class="text-gray-500">string</span>) {
         userID := req.PathParams[<span class="text-primary">"id"</span>]
         <span class="text-gray-500">return</span> server.<span class="text-primary">CreateResponseBytes</span>(<span class="text-primary">"200"</span>, <span class="text-primary">"text/plain"</span>, <span class="text-primary">"OK"</span>, []<span class="text-gray-500">byte</span>(userID))
     })
 
-    <span class="text-gray-600">// See GitHub for full server setup with listeners</span>
+    <span class="text-gray-600">// Graceful shutdown on Ctrl+C</span>
+    <span class="text-gray-500">if</span> err := srv.<span class="text-primary">ListenAndServe</span>(); err != <span class="text-gray-500">nil</span> {
+        log.<span class="text-primary">Fatal</span>(err)
+    }
 }</code></pre>
                 </div>
             </div>

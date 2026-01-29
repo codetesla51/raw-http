@@ -329,6 +329,116 @@ go test ./server/... -v
 - Response formatting
 - Error handling
 
+## Technical Internals
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Server Struct                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   Router    │  │  TLS Config │  │  Graceful Shutdown  │  │
+│  └──────┬──────┘  └─────────────┘  └─────────────────────┘  │
+└─────────┼───────────────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Connection Handler                        │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ Buffer Pool │  │  Request    │  │  Keep-Alive Loop    │  │
+│  │  (sync.Pool)│  │  Parser     │  │                     │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Buffer Pooling
+
+Three `sync.Pool` instances reduce garbage collection pressure:
+
+| Pool | Buffer Size | Purpose |
+|------|-------------|---------|
+| `chunkBufferPool` | 4KB | Reading from TCP connection |
+| `requestBufferPool` | 8KB | Accumulating request headers |
+| `responseBufferPool` | Dynamic | Building HTTP responses |
+
+Buffers larger than 16KB are discarded to prevent memory bloat.
+
+```go
+// How it works internally
+buf := chunkBufferPool.Get().(*[]byte)
+defer chunkBufferPool.Put(buf)
+n, _ := conn.Read(*buf)
+```
+
+### Graceful Shutdown
+
+The server handles `SIGINT` and `SIGTERM` signals:
+
+1. Stop accepting new connections
+2. Wait for active connections to finish (2 second grace period)
+3. Close all listeners
+4. Exit cleanly
+
+```go
+// Automatic signal handling
+srv := server.NewServer(":8080")
+srv.ListenAndServe()  // Blocks until Ctrl+C
+
+// Or use custom context for programmatic shutdown
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+srv.ListenAndServeContext(ctx)
+```
+
+### Keep-Alive Connections
+
+HTTP/1.1 keep-alive is enabled by default:
+
+- Connections are reused for multiple requests
+- Idle timeout: 120 seconds (configurable)
+- Reduces TCP handshake overhead
+- Significantly improves throughput (5k → 11k req/sec)
+
+### Request Parsing
+
+Zero-allocation parsing where possible:
+
+1. Read raw bytes from connection into pooled buffer
+2. Split headers from body at `\r\n\r\n` marker
+3. Parse request line: `METHOD /path HTTP/1.1`
+4. Parse headers into map (single allocation)
+5. Parse body based on Content-Type (JSON or form-encoded)
+
+### Panic Recovery
+
+Every connection handler is wrapped with recovery:
+
+```go
+defer func() {
+    if err := recover(); err != nil {
+        log.Printf("PANIC recovered: %v\n%s", err, debug.Stack())
+        conn.Write(errorResponse500)
+    }
+}()
+```
+
+A panic in one handler won't crash the server.
+
+### Path Traversal Protection
+
+Static file serving blocks directory traversal attempts:
+
+```go
+// These are blocked:
+// /../etc/passwd
+// /pages/../../../etc/passwd
+// /%2e%2e/etc/passwd
+
+if strings.Contains(cleanPath, "..") {
+    return Serve403()
+}
+```
+
 ## Performance
 
 Benchmarks on 8-core system:
