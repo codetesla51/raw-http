@@ -287,3 +287,38 @@ func (r *Router) routeRequest(method, cleanPath string, queryMap, bodyMap map[st
 	// Try routing
 	return r.HandleBytes(method, cleanPath, queryMap, bodyMap, browserName)
 }
+
+// ListenAndServe starts the HTTP server on the given address.
+// Address should be in the format ":8080" or "localhost:8080".
+// This is a blocking call that runs until the server is stopped.
+func (r *Router) ListenAndServe(addr string) error {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
+
+	log.Printf("Server listening on http://%s\n", addr)
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Error accepting connection:", err)
+			continue
+		}
+		go r.RunConnection(conn)
+	}
+}
+
+// Serve accepts connections on the given listener and handles them.
+// This allows using a custom listener (e.g., TLS).
+func (r *Router) Serve(listener net.Listener) error {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Error accepting connection:", err)
+			continue
+		}
+		go r.RunConnection(conn)
+	}
+}

@@ -71,41 +71,26 @@ Here's a complete working server:
 package main
 
 import (
-    "context"
     "log"
-    "net"
-    "os"
-    "os/signal"
-    "syscall"
-    "time"
 
     "github.com/codetesla51/raw-http/server"
 )
 
 func main() {
-    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-    defer stop()
-
-    listener, err := net.Listen("tcp", ":8080")
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer listener.Close()
-    log.Println("Server listening on http://localhost:8080")
-
-    router := server.NewRouter()
+    // Create server
+    srv := server.NewServer(":8080")
 
     // Register routes
-    router.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
+    srv.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
         return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
     })
 
-    router.Register("GET", "/users/:id", func(req *server.Request) ([]byte, string) {
+    srv.Register("GET", "/users/:id", func(req *server.Request) ([]byte, string) {
         userID := req.PathParams["id"]
         return server.CreateResponseBytes("200", "text/plain", "OK", []byte("User: "+userID))
     })
 
-    router.Register("POST", "/api/data", func(req *server.Request) ([]byte, string) {
+    srv.Register("POST", "/api/data", func(req *server.Request) ([]byte, string) {
         name := req.Body["name"]
         if name == "" {
             return server.Serve400("name is required")
@@ -113,25 +98,10 @@ func main() {
         return server.Serve201("created: " + name)
     })
 
-    // Accept connections
-    go func() {
-        for {
-            conn, err := listener.Accept()
-            if err != nil {
-                select {
-                case <-ctx.Done():
-                    return
-                default:
-                    continue
-                }
-            }
-            go router.RunConnection(conn)
-        }
-    }()
-
-    <-ctx.Done()
-    log.Println("Shutting down...")
-    time.Sleep(2 * time.Second)
+    // Start server (blocks until Ctrl+C)
+    if err := srv.ListenAndServe(); err != nil {
+        log.Fatal(err)
+    }
 }
 ```
 
@@ -246,12 +216,29 @@ router.Register("POST", "/login", func(req *server.Request) ([]byte, string) {
 
 ## Configuration
 
+### Using Server with Config
+
+```go
+cfg := &server.Config{
+    ReadTimeout:     60 * time.Second,
+    WriteTimeout:    30 * time.Second,
+    MaxBodySize:     50 * 1024 * 1024,  // 50MB
+    EnableKeepAlive: true,
+}
+
+srv := server.NewServerWithConfig(":8080", cfg)
+srv.Register("GET", "/ping", handler)
+srv.ListenAndServe()
+```
+
+### Using Router Directly
+
 ```go
 cfg := server.DefaultConfig()
 cfg.ReadTimeout = 60 * time.Second
-cfg.MaxBodySize = 50 * 1024 * 1024  // 50MB
 
 router := server.NewRouterWithConfig(cfg)
+router.ListenAndServe(":8080")
 ```
 
 | Option | Type | Default | Description |
@@ -302,14 +289,23 @@ This page is returned for any unmatched route. If the file doesn't exist, the se
 
 ## TLS/HTTPS
 
-The server enables HTTPS automatically if certificate files exist:
+Enable HTTPS with a single line:
+
+```go
+srv := server.NewServer(":8080")
+srv.EnableTLS(":8443", "server.crt", "server.key")
+srv.Register("GET", "/ping", handler)
+srv.ListenAndServe()  // Serves HTTP on 8080 and HTTPS on 8443
+```
+
+### Generate Certificates
 
 ```bash
 # Generate self-signed certificate (development only)
 openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
 ```
 
-Place `server.crt` and `server.key` in the project root. HTTPS listens on port 8443.
+Place `server.crt` and `server.key` in the project root.
 
 For production, use Let's Encrypt:
 
