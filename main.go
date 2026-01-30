@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/codetesla51/raw-http/server"
 )
@@ -42,6 +44,15 @@ func main() {
 	// Health check endpoint
 	srv.Register("GET", "/ping", func(req *server.Request) ([]byte, string) {
 		return server.CreateResponseBytes("200", "text/plain", "OK", []byte("pong"))
+	})
+
+	// Serve index.html at root
+	srv.Register("GET", "/", func(req *server.Request) ([]byte, string) {
+		content, err := os.ReadFile(filepath.Join("pages", "index.html"))
+		if err != nil {
+			return server.Serve500("could not load index.html")
+		}
+		return server.CreateResponseBytes("200", "text/html", "OK", content)
 	})
 
 	// Error handling example (panic recovery)
