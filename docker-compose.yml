@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  raw-http:
+    build: .
+    container_name: raw-http-server
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./pages:/app/pages
+      - ./server.crt:/app/server.crt:ro
+      - ./server.key:/app/server.key:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
