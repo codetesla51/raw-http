@@ -47,7 +47,7 @@ func main() {
 
 	// Serve index.html at root
 	srv.Register("GET", "/", func(req *server.Request) ([]byte, string) {
-		content, err := os.ReadFile("/app/pages/index.html")
+		content, err := os.ReadFile("pages/index.html")
 		if err != nil {
 			return server.Serve500("could not load index.html")
 		}
