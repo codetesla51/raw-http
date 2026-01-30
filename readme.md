@@ -43,7 +43,7 @@ raw-http is an HTTP/1.1 server implementation that handles:
 ### As a dependency
 
 ```bash
-go get github.com/codetesla51/raw-http@v1.0.0
+go get github.com/codetesla51/raw-http@v1.0.1
 ```
 
 Then import in your code:
